@@ -9,6 +9,6 @@
 <div align="center"><em>你准备好踏入这段未知的全新旅程了吗?</em></div>
 
 <div style="display:flex;justify-content: space-between;" class="nav-area">
-<a class="internal-link" target="" data-note-icon="/announcement/announcement/" ><button><span><em>招募公告</em></span></button></a>
+<a class="internal-link" target="" data-note-icon="" href="/announcement/announcement/" ><button><span><em>招募公告</em></span></button></a>
 <button><span><em><a class="internal-link" target="" data-note-icon="" href="/lit-m/1/1/">加入游戏</a></em></span></button>
 <button><span><em><a class="internal-link" target="" data-note-icon="" href="/lit-m/3/0/">规则速查</a></em></span></button></div>
