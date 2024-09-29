@@ -7,3 +7,8 @@
 <div align="center"><em>山间湖面荡起涟漪。远处传来乌鸦啼鸣。</em></div>
 <div align="center"><em>瞑瞑林地里窸窣作响，近在咫尺，却渺无踪影。</em></div>
 <div align="center"><em>你准备好踏入这段未知的全新旅程了吗?</em></div>
+<div class="quick navigation">
+    <button><em>招募公告</em></button>
+    <button><em>加入游戏</em></button>
+    <button><em>规则速查</em></button>
+</div>
