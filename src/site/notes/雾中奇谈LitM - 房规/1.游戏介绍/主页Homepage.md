@@ -9,12 +9,13 @@
 <div align="center"><em>你准备好踏入这段未知的全新旅程了吗?</em></div>
 <br>
 <br>
-<div style="display:flex;justify-content: space-evenly;flex-wrap:wrap;align-items: space-between;height:140px;" class="nav-area">
+<div style="display:flex;justify-content: space-evenly;flex-wrap:wrap;" class="nav-area">
 <div>
 <a class="internal-link" target="" data-note-icon="" href="/announcement/announcement/" ><button><span><em>招募公告</em></span></button></a>
 <a class="internal-link" target="" data-note-icon="" href="/lit-m/1/1/"><button><span><em>加入游戏</em></span></button></a></div>
 </div>
-
+<br>
+<br>
 <div>
 <a class="internal-link" target="" data-note-icon="" href="/lit-m/1/1/"><button><span><em>加入游戏</em></span></button></a>
 <a class="internal-link" target="" data-note-icon="" href="/lit-m/3/0/"><button><span><em>规则速查</em></span></button></a>
