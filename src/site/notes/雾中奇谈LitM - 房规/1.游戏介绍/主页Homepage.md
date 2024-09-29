@@ -10,5 +10,5 @@
 
 <div style="display:flex;justify-content: space-between;" class="nav-area">
 <a class="internal-link" target="" data-note-icon="" href="/announcement/announcement/" ><button><span><em>招募公告</em></span></button></a>
-<button><span><em><a class="internal-link" target="" data-note-icon="" href="/lit-m/1/1/">加入游戏</a></em></span></button>
-<button><span><em><a class="internal-link" target="" data-note-icon="" href="/lit-m/3/0/">规则速查</a></em></span></button></div>
+<a class="internal-link" target="" data-note-icon="" href="/lit-m/1/1/"><button><span><em>加入游戏</em></span></button></a>
+<a class="internal-link" target="" data-note-icon="" href="/lit-m/3/0/"><button><span><em>规则速查</em></span></button></a></div>
