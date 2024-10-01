@@ -16,6 +16,6 @@
 <br>
 <br>
 <div style="display:flex;justify-content: space-evenly;flex-wrap:wrap;" class="nav-area">
-<a class="internal-link" target="" data-note-icon="" href="/lit-m/1/1/"><button><span><em>加入游戏</em></span></button></a>
+<button onclick="window.location.href='http://121.40.23.76:30000/'"><span><em>网团平台</em></span></button>
 <a class="internal-link" target="" data-note-icon="" href="/lit-m/3/0/"><button><span><em>规则速查</em></span></button></a>
 </div>
