@@ -10,12 +10,12 @@
 <br>
 <br>
 <div style="display:flex;justify-content: space-evenly;flex-wrap:wrap;" class="nav-area">
-<a class="internal-link" target="" data-note-icon="" href="/announcement/announcement/" ><button><span><em>招募公告</em></span></button></a>
-<a class="internal-link" target="" data-note-icon="" href="/lit-m/1/1/"><button><span><em>加入游戏</em></span></button></a>
+<a class="internal-link" target="" data-note-icon="" href="/公告/公告/" ><button><span><em>招募公告</em></span></button></a>
+<a class="internal-link" target="" data-note-icon="" href="/雾中奇谈-房规/1.游戏介绍/1.战役介绍/"><button><span><em>加入游戏</em></span></button></a>
 </div>
 <br>
 <br>
 <div style="display:flex;justify-content: space-evenly;flex-wrap:wrap;" class="nav-area">
 <button onclick="window.location.href='http://121.40.23.76:30000/'"><span><em>网团平台</em></span></button>
-<a class="internal-link" target="" data-note-icon="" href="/lit-m/3/0/"><button><span><em>规则速查</em></span></button></a>
+<a class="internal-link" target="" data-note-icon="" href="/雾中奇谈-房规/3.核心规则/0.核心规则/"><button><span><em>规则速查</em></span></button></a>
 </div>
