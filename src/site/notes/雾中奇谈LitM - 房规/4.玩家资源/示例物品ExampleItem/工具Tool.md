@@ -1,5 +1,5 @@
 ---
-{"dg-publish":true,"permalink":"/lit-m/4/example-item/tool/"}
+{"dg-publish":true,"permalink":"/雾中奇谈LitM - 房规/4.玩家资源/示例物品ExampleItem/工具Tool/"}
 ---
 
 

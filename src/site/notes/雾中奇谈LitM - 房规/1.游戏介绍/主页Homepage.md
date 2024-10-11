@@ -1,5 +1,5 @@
 ---
-{"dg-publish":true,"permalink":"/lit-m/1/homepage/","contentClasses":"nav-area","tags":["gardenEntry"]}
+{"dg-publish":true,"permalink":"/雾中奇谈LitM - 房规/1.游戏介绍/主页Homepage/","contentClasses":"nav-area","tags":["gardenEntry"]}
 ---
 
 

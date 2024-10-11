@@ -1,5 +1,5 @@
 ---
-{"dg-publish":true,"permalink":"/lit-m/term/consequnces/"}
+{"dg-publish":true,"permalink":"/雾中奇谈LitM - 房规/术语Term/后果Consequnces/"}
 ---
 
 故事的负面发展，情况更为复杂，处境更加危险。
