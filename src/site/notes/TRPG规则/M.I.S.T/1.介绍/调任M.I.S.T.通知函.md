@@ -4,7 +4,7 @@
 
 ██████，
 
-因工作需要，您已被调任至**调查、压制与秘艺研究部**(**M**inistry of **I**nvestigation, **S**uppression and **T**haumaturgy; 以下简称**M.I.S.T.**，或称迷雾部)。请即刻依如下条例办理:
+因工作需要，您已被调任至**调查、压制与秘艺研究部**(**M**inistry of **I**nvestigation, **S**uppression and **T**haumaturgy; 以下简称**M.I.S.T.**，迷雾部)。请即刻依如下条例办理:
 
 1. 于原单位转出人事关系、档案至**M.I.S.T.**。
 2. 随函附有保密协议，请勿阅读，并于最后一页签名处以工整字迹签名。
