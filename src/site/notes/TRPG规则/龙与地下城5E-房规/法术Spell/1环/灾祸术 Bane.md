@@ -1,6 +1,7 @@
 ---
-{"dg-publish":true,"permalink":"/pioneer/core-rule/spell/1/bane/"}
+{"dg-publish":true,"permalink":"/TRPG规则/龙与地下城5E-房规/法术Spell/1环/灾祸术 Bane/"}
 ---
+
 
 **学派**： #惑控
 **环阶**： #1环

@@ -1,6 +1,7 @@
 ---
-{"dg-publish":true,"permalink":"/pioneer/core-rule/item/gear/ladder/"}
+{"dg-publish":true,"permalink":"/TRPG规则/龙与地下城5E-房规/物品Item/冒险用品Gear/爬梯 Ladder/"}
 ---
+
 
 # 描述
 由结实的绳索拴挂而成的软性爬梯。具有10点生命值，通过一次成功的DC19的力量检定才能扯断。

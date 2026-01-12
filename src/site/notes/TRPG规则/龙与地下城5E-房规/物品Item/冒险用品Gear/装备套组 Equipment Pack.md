@@ -1,6 +1,7 @@
 ---
-{"dg-publish":true,"permalink":"/pioneer/core-rule/item/gear/equipment-pack/"}
+{"dg-publish":true,"permalink":"/TRPG规则/龙与地下城5E-房规/物品Item/冒险用品Gear/装备套组 Equipment Pack/"}
 ---
+
 
 # 描述
 一些实用的冒险补给会按套装销售，这被称为套组。套组会占用 2 负重，但能够提供 3 个特殊的补给位；当你消耗来自套组的补给位拿出物品时，只能从下表中套组描述的内容物中选取。

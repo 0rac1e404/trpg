@@ -1,6 +1,7 @@
 ---
-{"dg-publish":true,"permalink":"/pioneer/core-rule/spell/3/dispel-magic/"}
+{"dg-publish":true,"permalink":"/TRPG规则/龙与地下城5E-房规/法术Spell/3环/解除魔法 Dispel Magic/"}
 ---
+
 
 **学派**： #防护
 **环阶**： #3环

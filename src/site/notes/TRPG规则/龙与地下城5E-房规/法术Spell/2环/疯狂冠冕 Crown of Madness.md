@@ -1,6 +1,7 @@
 ---
-{"dg-publish":true,"permalink":"/pioneer/core-rule/spell/2/crown-of-madness/"}
+{"dg-publish":true,"permalink":"/TRPG规则/龙与地下城5E-房规/法术Spell/2环/疯狂冠冕 Crown of Madness/"}
 ---
+
 
 **学派**： #惑控
 **环阶**： #2环

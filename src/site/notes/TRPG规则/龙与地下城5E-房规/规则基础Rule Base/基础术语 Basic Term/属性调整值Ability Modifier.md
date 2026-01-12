@@ -1,6 +1,7 @@
 ---
-{"dg-publish":true,"permalink":"/pioneer/core-rule/rule-base/basic-term/ability-modifier/"}
+{"dg-publish":true,"permalink":"/TRPG规则/龙与地下城5E-房规/规则基础Rule Base/基础术语 Basic Term/属性调整值Ability Modifier/"}
 ---
+
 
 属性调整值是指在进行检定时，基于属性获得的调整值。它们遵照下表进行换算：
 

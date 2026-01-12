@@ -1,6 +1,7 @@
 ---
-{"dg-publish":true,"permalink":"/pioneer/core-rule/item/supply/oil/"}
+{"dg-publish":true,"permalink":"/TRPG规则/龙与地下城5E-房规/物品Item/补给Supply/灯油 Oil/"}
 ---
+
 
 # 描述
 灯油通常装在一个1品脱大小的陶土扁瓶中。从动植物上提取的纯净脂肪，易于燃烧。

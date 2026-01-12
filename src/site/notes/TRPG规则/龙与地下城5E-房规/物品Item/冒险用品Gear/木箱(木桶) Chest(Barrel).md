@@ -1,6 +1,7 @@
 ---
-{"dg-publish":true,"permalink":"/pioneer/core-rule/item/gear/chest-barrel/"}
+{"dg-publish":true,"permalink":"/TRPG规则/龙与地下城5E-房规/物品Item/冒险用品Gear/木箱(木桶) Chest(Barrel)/"}
 ---
+
 
 # 描述
 由硬木板制成的箱子或桶子，可以容纳10负重的物品。木箱能够上锁以确保内容物的安全，木桶则可以承装大量的液体。

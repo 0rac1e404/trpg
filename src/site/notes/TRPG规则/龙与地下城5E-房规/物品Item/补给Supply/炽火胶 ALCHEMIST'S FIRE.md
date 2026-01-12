@@ -1,6 +1,7 @@
 ---
-{"dg-publish":true,"permalink":"/pioneer/core-rule/item/supply/alchemist-s-fire/"}
+{"dg-publish":true,"permalink":"/TRPG规则/龙与地下城5E-房规/物品Item/补给Supply/炽火胶 ALCHEMIST'S FIRE/"}
 ---
+
 
 # 描述
 这个奇妙的炼金产物是一种粘稠的流体，一旦接触空气就会自燃。

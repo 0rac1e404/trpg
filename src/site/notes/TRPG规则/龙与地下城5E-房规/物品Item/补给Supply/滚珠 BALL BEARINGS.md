@@ -1,6 +1,7 @@
 ---
-{"dg-publish":true,"permalink":"/pioneer/core-rule/item/supply/ball-bearings/"}
+{"dg-publish":true,"permalink":"/TRPG规则/龙与地下城5E-房规/物品Item/补给Supply/滚珠 BALL BEARINGS/"}
 ---
+
 
 # 描述
 这些金属小球表面十分光滑，每一小包都有1000个。

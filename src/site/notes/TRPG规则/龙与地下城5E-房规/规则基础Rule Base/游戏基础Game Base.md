@@ -1,6 +1,7 @@
 ---
-{"dg-publish":true,"permalink":"/pioneer/core-rule/rule-base/game-base/"}
+{"dg-publish":true,"permalink":"/TRPG规则/龙与地下城5E-房规/规则基础Rule Base/游戏基础Game Base/"}
 ---
+
 
 
 # 简介

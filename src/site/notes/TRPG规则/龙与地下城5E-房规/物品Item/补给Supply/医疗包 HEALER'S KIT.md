@@ -1,6 +1,7 @@
 ---
-{"dg-publish":true,"permalink":"/pioneer/core-rule/item/supply/healer-s-kit/"}
+{"dg-publish":true,"permalink":"/TRPG规则/龙与地下城5E-房规/物品Item/补给Supply/医疗包 HEALER'S KIT/"}
 ---
+
 
 # 描述
 一个医疗用小皮包中，装有绷带、药膏和夹板。

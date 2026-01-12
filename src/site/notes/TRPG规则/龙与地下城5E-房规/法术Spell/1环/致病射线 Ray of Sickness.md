@@ -1,6 +1,7 @@
 ---
-{"dg-publish":true,"permalink":"/pioneer/core-rule/spell/1/ray-of-sickness/"}
+{"dg-publish":true,"permalink":"/TRPG规则/龙与地下城5E-房规/法术Spell/1环/致病射线 Ray of Sickness/"}
 ---
+
 
 **学派**： #死灵
 **环阶**： #1环

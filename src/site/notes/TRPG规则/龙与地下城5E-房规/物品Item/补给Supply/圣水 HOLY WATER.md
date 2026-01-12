@@ -1,6 +1,7 @@
 ---
-{"dg-publish":true,"permalink":"/pioneer/core-rule/item/supply/holy-water/"}
+{"dg-publish":true,"permalink":"/TRPG规则/龙与地下城5E-房规/物品Item/补给Supply/圣水 HOLY WATER/"}
 ---
+
 
 # 描述
 经过神圣力量祝福的清水，能够伤害不洁的生物。

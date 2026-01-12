@@ -1,6 +1,7 @@
 ---
-{"dg-publish":true,"permalink":"/pioneer/core-rule/spell/9/wish/"}
+{"dg-publish":true,"permalink":"/TRPG规则/龙与地下城5E-房规/法术Spell/9环/祈愿术wish/"}
 ---
+
 
 **学派**： #咒法
 **环阶**： #9环

@@ -1,6 +1,7 @@
 ---
-{"dg-publish":true,"permalink":"/pioneer/core-rule/item/supply/acid/"}
+{"dg-publish":true,"permalink":"/TRPG规则/龙与地下城5E-房规/物品Item/补给Supply/强酸 ACID/"}
 ---
+
 
 # 描述
 这种炼金用品被保存在一个小小的扁瓶中。它能够腐蚀植物纤维、软金属与巨魔的皮肤。

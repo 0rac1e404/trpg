@@ -1,6 +1,7 @@
 ---
-{"dg-publish":true,"permalink":"/pioneer/core-rule/spell/1/cause-fear/"}
+{"dg-publish":true,"permalink":"/TRPG规则/龙与地下城5E-房规/法术Spell/1环/造成恐惧 Cause Fear/"}
 ---
+
 
 **学派**： #死灵
 **环阶**： #1环

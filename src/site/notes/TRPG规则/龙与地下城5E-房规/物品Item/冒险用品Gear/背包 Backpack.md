@@ -1,6 +1,7 @@
 ---
-{"dg-publish":true,"permalink":"/pioneer/core-rule/item/gear/backpack/"}
+{"dg-publish":true,"permalink":"/TRPG规则/龙与地下城5E-房规/物品Item/冒险用品Gear/背包 Backpack/"}
 ---
+
 
 # 描述
 耐用的鞣制皮革制成的背包，带有多个口袋，还能在外面悬挂或捆绑物品。背包会占用1负重，但能为你提供3个负重位。

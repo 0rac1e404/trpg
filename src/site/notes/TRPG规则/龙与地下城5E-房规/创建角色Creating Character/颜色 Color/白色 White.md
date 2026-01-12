@@ -1,6 +1,7 @@
 ---
-{"dg-publish":true,"permalink":"/pioneer/core-rule/creating-character/color/white/"}
+{"dg-publish":true,"permalink":"/TRPG规则/龙与地下城5E-房规/创建角色Creating Character/颜色 Color/白色 White/"}
 ---
+
 
 **临色**：[[开拓Pioneer/核心规则Core Rule/创建角色Creating Character/颜色 Color/绿色 Green\|绿色]]、[[开拓Pioneer/核心规则Core Rule/创建角色Creating Character/颜色 Color/蓝色 Blue\|蓝色]]
 **对色**：黑色、[[开拓Pioneer/核心规则Core Rule/创建角色Creating Character/颜色 Color/红色 Red\|红色]]

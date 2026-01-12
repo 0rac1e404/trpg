@@ -1,6 +1,7 @@
 ---
-{"dg-publish":true,"permalink":"/pioneer/core-rule/item/supply/tool/"}
+{"dg-publish":true,"permalink":"/TRPG规则/龙与地下城5E-房规/物品Item/补给Supply/工具 TOOL/"}
 ---
+
 
 # 描述
 工具可以协助你完成一些平时难以达到的事情，例如制作或修复物品、伪造文书、撬锁等。

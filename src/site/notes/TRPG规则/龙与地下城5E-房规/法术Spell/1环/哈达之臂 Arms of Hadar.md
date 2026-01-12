@@ -1,6 +1,7 @@
 ---
-{"dg-publish":true,"permalink":"/pioneer/core-rule/spell/1/arms-of-hadar/"}
+{"dg-publish":true,"permalink":"/TRPG规则/龙与地下城5E-房规/法术Spell/1环/哈达之臂 Arms of Hadar/"}
 ---
+
 
 **学派**： #咒法
 **环阶**： #1环

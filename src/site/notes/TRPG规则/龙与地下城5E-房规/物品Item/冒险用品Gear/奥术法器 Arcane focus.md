@@ -1,6 +1,7 @@
 ---
-{"dg-publish":true,"permalink":"/pioneer/core-rule/item/gear/arcane-focus/"}
+{"dg-publish":true,"permalink":"/TRPG规则/龙与地下城5E-房规/物品Item/冒险用品Gear/奥术法器 Arcane focus/"}
 ---
+
 
 # 描述
 奥术法器是为引导奥术法术能量而设计的特殊物品，像是一枚法球、一块水晶、一只权杖、一根特制法杖、一根魔杖长短的木条、或是其它类似的物品。
