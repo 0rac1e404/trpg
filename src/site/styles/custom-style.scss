@@ -104,13 +104,6 @@ h1, h2, h3, h4, h5, h6 {
   stroke: #666666 !important;
 }
 
-/* 文字颜色 */
-.mermaid .node text,
-.mermaid .edgeLabel text {
-  fill: #e0e0e0 !important;
-  color: #e0e0e0 !important;
-}
-
 /* 连线颜色 */
 .mermaid .edgePath .path {
   stroke: #888888 !important;
