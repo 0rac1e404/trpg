@@ -96,24 +96,6 @@ h1, h2, h3, h4, h5, h6 {
   padding: 16px;
 }
 
-/* 节点样式 */
-.mermaid .node rect,
-.mermaid .node circle,
-.mermaid .node ellipse {
-  fill: #2d2d2d !important;
-  stroke: #666666 !important;
-}
-
-/* 连线颜色 */
-.mermaid .edgePath .path {
-  stroke: #888888 !important;
-}
-
-/* 箭头颜色 */
-.mermaid .arrowheadPath {
-  fill: #888888 !important;
-}
-
 /* 标签背景 */
 .mermaid .label rect {
   fill: #2d2d2d !important;
