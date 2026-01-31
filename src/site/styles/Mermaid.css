@@ -1,0 +1,12 @@
+/* 让所有 Mermaid 图表居中 */
+.mermaid {
+  display: block !important;
+  margin: 0 auto !important;
+  text-align: center !important;
+}
+
+/* 或者只针对特定容器 */
+.markdown-preview-view .mermaid {
+  display: block !important;
+  margin: 0 auto !important;
+}
