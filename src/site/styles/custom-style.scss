@@ -88,3 +88,57 @@ h1, h2, h3, h4, h5, h6 {
   display: block !important;
   margin: 0 auto !important;
 }
+
+/* Mermaid 深色主题适配 */
+.mermaid {
+  background-color: #1a1a1a !important;
+  border-radius: 8px;
+  padding: 16px;
+}
+
+/* 节点样式 */
+.mermaid .node rect,
+.mermaid .node circle,
+.mermaid .node ellipse {
+  fill: #2d2d2d !important;
+  stroke: #666666 !important;
+}
+
+/* 文字颜色 */
+.mermaid .node text,
+.mermaid .edgeLabel text {
+  fill: #e0e0e0 !important;
+  color: #e0e0e0 !important;
+}
+
+/* 连线颜色 */
+.mermaid .edgePath .path {
+  stroke: #888888 !important;
+}
+
+/* 箭头颜色 */
+.mermaid .arrowheadPath {
+  fill: #888888 !important;
+}
+
+/* 标签背景 */
+.mermaid .label rect {
+  fill: #2d2d2d !important;
+}
+
+/* 特定样式设置 */
+.mermaid .node[id*="Now"] rect {
+  fill: #3a3a3a !important;
+  stroke: #ff6b6b !important;
+  stroke-width: 2px !important;
+}
+
+.mermaid .node[id*="Past"] rect {
+  fill: #2a2a5a !important;
+  stroke: #6666ff !important;
+}
+
+.mermaid .node[id*="Test"] rect {
+  fill: #5a4a2a !important;
+  stroke: #ff9900 !important;
+}
