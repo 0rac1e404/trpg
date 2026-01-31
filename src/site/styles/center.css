@@ -1,19 +1,31 @@
+/* 图片居中 */
 img {
-        display: block !important;
-        margin-left: auto !important;
-        margin-right: auto !important;
-}
-    
- .markdown-source-view.mod-cm6 .cm-content > * {
-        margin: auto auto !important;
+    display: block !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
 }
 
-{
-  "ITS@@select": "wotc-beyond"
+/* Markdown 源码视图中的内容居中 */
+.markdown-source-view.mod-cm6 .cm-content > * {
+    margin: 0 auto !important;
 }
 
-/* Center tables on the page */
+/* Markdown 预览视图中的表格居中 */
 .markdown-preview-view table {
     margin-left: auto;
     margin-right: auto;
+}
+
+/* Mermaid 图表居中 */
+.mermaid {
+    display: block !important;
+    margin: 0 auto !important;
+    text-align: center !important;
+}
+
+/* 确保 Mermaid 图表在阅读视图中也居中 */
+.markdown-reading-view .mermaid {
+    display: block !important;
+    margin: 0 auto !important;
+    text-align: center !important;
 }
