@@ -10,7 +10,7 @@ Publish this note, then use **Publish changes → Add linked** to include all ma
 
 ## Assets
 
-- [TRPG规则/伯爵红茶/星图/Drawing 2026-07-24 19.02.19.excalidraw.svg](/img/user/TRPG%E8%A7%84%E5%88%99/%E4%BC%AF%E7%88%B5%E7%BA%A2%E8%8C%B6/%E6%98%9F%E5%9B%BE/Drawing%202026-07-24%2019.02.19.excalidraw.svg)
+- [星图.svg](/img/user/TRPG%E8%A7%84%E5%88%99/%E4%BC%AF%E7%88%B5%E7%BA%A2%E8%8C%B6/%E6%98%9F%E5%9B%BE/%E6%98%9F%E5%9B%BE.svg)
 - [[ZoomMap/publish/assets\|ZoomMap/publish/assets]]
 - [[ZoomMap/publish/library\|ZoomMap/publish/library]]
 - [[ZoomMap/publish/markers/m-rji0pv\|ZoomMap/publish/markers/m-rji0pv]]
