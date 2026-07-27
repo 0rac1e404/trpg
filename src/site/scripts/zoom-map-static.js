@@ -36,10 +36,11 @@
       if (h1El) text += (h1El.textContent || "").trim();
       if (contentEl) {
         const bodyText = (contentEl.textContent || "").trim();
-        const snippet = bodyText.slice(0, 300);
+        const normalized = bodyText.replace(/\s+/g, " ").trim();
+        const snippet = normalized.slice(0, 300);
         if (text) text += "\n";
         text += snippet;
-        if (bodyText.length > 300) text += "\u2026";
+        if (normalized.length > 300) text += "\u2026";
       }
       const result = text || "\uFF08\u9875\u9762\u5185\u5BB9\u4E3A\u7A7A\uFF09";
       pagePreviewCache.set(url, result);
@@ -62,9 +63,9 @@
       const name = pageName(m.link);
       const url = normalizeLink(m.link);
       if (hasTooltip) html += '<hr style="margin:4px 0;border-color:rgba(255,255,255,0.15);">';
-      html += `<a class="zm-st-tooltip-link" href="${escapeHtml(url)}" style="color:#8cb4ff;text-decoration:underline;display:block;margin-bottom:4px;">\u{1F4C4} ${escapeHtml(name)}</a>`;
+      html += `<a class="zm-st-tooltip-link" href="${escapeHtml(url)}" style="color:#8cb4ff;text-decoration:underline;display:flex;align-items:center;gap:5px;margin-bottom:4px;"><img src="/img/zoom-map-icons/anchor.svg" alt="" style="width:14px;height:14px;flex-shrink:0;">${escapeHtml(name)}</a>`;
       if (previewText !== void 0) {
-        html += `<div class="zm-st-preview-text" style="font-size:12px;line-height:1.5;opacity:0.85;white-space:pre-wrap;max-height:150px;overflow-y:auto;">${escapeHtml(previewText)}</div>`;
+        html += `<div class="zm-st-preview-text" style="font-size:12px;line-height:1.5;opacity:0.85;max-height:150px;overflow-y:auto;">${escapeHtml(previewText)}</div>`;
       } else {
         html += `<div class="zm-st-preview-text zm-st-preview-loading" style="font-size:12px;opacity:0.55;">\u52A0\u8F7D\u9884\u89C8\u4E2D\u2026</div>`;
       }
@@ -486,8 +487,9 @@
           this.renderSimpleMarker(m);
           continue;
         }
+        const baseSize = typeof m.sizeOverride === "number" && m.sizeOverride > 0 ? m.sizeOverride : icon.size;
         const scaleMul = (_b = m.scale) != null ? _b : 1;
-        const size = icon.size * scaleMul;
+        const size = baseSize * scaleMul;
         const ax = icon.anchorX;
         const ay = icon.anchorY;
         const leftPx = m.x * this.imgW;
