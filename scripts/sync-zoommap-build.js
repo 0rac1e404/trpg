@@ -4,8 +4,10 @@
  * Usage:
  *   node scripts/sync-zoommap-build.js
  *
- * Config:
+ * Environment:
  *   ZOOM_MAP_PATH – path to zoom-map project root (default: E:/git/zoom-map/zoom-map)
+ *
+ * Gracefully skips when the zoom-map project is not available (e.g. Vercel build).
  */
 
 const { execSync } = require("child_process");
@@ -21,19 +23,29 @@ const SRC_FILE = path.join(ZOOM_MAP_PATH, "zoom-map-static.js");
 // ── Main ───────────────────────────────────────────────────────
 
 function buildAndCopy() {
+  // 0. Check if destination already exists (for Vercel/CI envs)
+  if (!fs.existsSync(ZOOM_MAP_PATH) || !fs.existsSync(path.join(ZOOM_MAP_PATH, "package.json"))) {
+    if (fs.existsSync(DST_FILE)) {
+      console.log("[sync-zoommap] Zoom Map project not available; using existing zoom-map-static.js in repo.");
+    } else {
+      console.warn("[sync-zoommap] Zoom Map project not available and no existing zoom-map-static.js found.");
+    }
+    return;
+  }
+
   // 1. Build in zoom-map project
   console.log(`[sync-zoommap] Building in ${ZOOM_MAP_PATH}...`);
   try {
     execSync("npm run build:static", { cwd: ZOOM_MAP_PATH, stdio: "inherit" });
   } catch (err) {
     console.error("[sync-zoommap] Build failed. Make sure dependencies are installed.");
-    process.exit(1);
+    return;
   }
 
   // 2. Verify source exists
   if (!fs.existsSync(SRC_FILE)) {
     console.error(`[sync-zoommap] Build output not found: ${SRC_FILE}`);
-    process.exit(1);
+    return;
   }
 
   // 3. Compare and copy

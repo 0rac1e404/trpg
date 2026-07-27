@@ -1,10 +1,10 @@
-{
+﻿{
     "name": "web",
     "version": "1.0.0",
     "description": "",
     "main": "index.js",
     "scripts": {
-        "prebuild": "rimraf dist && node scripts/sync-svgs.js",
+        "prebuild": "rimraf dist && node scripts/sync-svgs.js && node scripts/sync-markers.js && node scripts/sync-zoommap-build.js",
         "dev": "npm-run-all get-theme build:sass --parallel watch:*",
         "watch:sass": "sass --watch src/site/styles:dist/styles",
         "watch:eleventy": "cross-env ELEVENTY_ENV=dev eleventy --serve",
@@ -16,6 +16,7 @@
         "sync:markers": "node scripts/sync-markers.js",
         "sync:zoommap": "node scripts/sync-zoommap-build.js",
         "sync:all": "node scripts/sync-all.js",
+        "deploy": "node scripts/sync-all.js && git add zoom-map-data/ src/site/scripts/ && git commit -m \"sync: markers & zoom-map-static\" && git push",
         "test": "vitest run"
     },
     "keywords": [],
