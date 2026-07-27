@@ -622,39 +622,85 @@
       preBlock.replaceWith(wrapper);
       const map = new StaticMap(wrapper);
       instances.push(map);
+      let markersLoaded = false;
       if (config.markersUrl) {
-        fetch(config.markersUrl).then((r) => r.ok ? r.json() : null).then((data) => {
-          if (data == null ? void 0 : data.markers) {
-            const markers = data.markers;
-            wrapper.setAttribute("data-zm-markers", JSON.stringify(markers));
-            map.destroy();
-            const newMap = new StaticMap(wrapper);
-            instances = instances.filter((m) => m !== map);
-            instances.push(newMap);
+        const safeId = safeDataId(config.markersUrl);
+        const embedded = document.getElementById(safeId);
+        if (embedded && embedded.textContent) {
+          try {
+            const data = JSON.parse(embedded.textContent);
+            if (data == null ? void 0 : data.markers) {
+              wrapper.setAttribute("data-zm-markers", JSON.stringify(data.markers));
+              markersLoaded = true;
+            }
+          } catch (_e) {
           }
-        }).catch(() => {
-        });
+        }
+        if (!markersLoaded) {
+          fetch(config.markersUrl).then((r) => r.ok ? r.json() : null).catch(() => null).then((data) => {
+            if (data == null ? void 0 : data.markers) {
+              const markers = data.markers;
+              wrapper.setAttribute("data-zm-markers", JSON.stringify(markers));
+            }
+          }).catch(() => {
+          });
+        }
+      }
+      if (markersLoaded) {
+        map.destroy();
+        const newMap = new StaticMap(wrapper);
+        instances = instances.filter((m) => m !== map);
+        instances.push(newMap);
       }
     }
+  }
+  function safeDataId(path) {
+    return "zm-data-" + btoa(unescape(encodeURIComponent(path))).replace(/[+/=]/g, "_");
   }
   function parseZoommapYaml(text) {
     var _a, _b, _c, _d;
     const lines = text.split("\n");
     const map = {};
+    const imageBases = [];
+    let inImageBases = false;
     for (const line of lines) {
       const trimmed = line.trim();
       if (!trimmed || trimmed.startsWith("#")) continue;
+      if (trimmed.startsWith("imageBases:") || trimmed.startsWith("imagebases:")) {
+        inImageBases = true;
+        continue;
+      }
+      if (inImageBases) {
+        const m = trimmed.match(/^- path:\s*(.+)$/i);
+        if (m) {
+          imageBases.push(m[1].trim());
+          continue;
+        }
+        if (!trimmed.startsWith("-") && !trimmed.startsWith(" ") && trimmed.indexOf(":") > 0) {
+          inImageBases = false;
+        }
+        if (!trimmed.startsWith(" ") && !trimmed.startsWith("-")) {
+          inImageBases = false;
+        }
+      }
+      if (inImageBases) continue;
       const idx = trimmed.indexOf(":");
       if (idx < 0) continue;
       const key = trimmed.substring(0, idx).trim();
       const value = trimmed.substring(idx + 1).trim();
       map[key] = value;
     }
-    if (!map.image || !map.markers) return null;
+    const imageUrl = imageBases.length > 0 ? imageBases[0] : map.image;
+    if (!imageUrl || !map.markers) return null;
     const imgW = parseFloat((_a = map.imgW) != null ? _a : "0") || void 0;
     const imgH = parseFloat((_b = map.imgH) != null ? _b : "0") || void 0;
+    const restBases = imageBases.length > 1 ? imageBases.slice(1).map((p, i) => ({
+      path: p,
+      url: p,
+      name: `Base ${i + 2}`
+    })) : void 0;
     return {
-      imageUrl: map.image,
+      imageUrl,
       markersUrl: map.markers,
       minZoom: parseFloat((_c = map.minZoom) != null ? _c : "0.1"),
       maxZoom: parseFloat((_d = map.maxZoom) != null ? _d : "10"),
@@ -664,7 +710,8 @@
       height: map.height,
       align: map.align,
       initialZoom: map.initialZoom ? parseFloat(map.initialZoom) : void 0,
-      iconProfiles: []
+      iconProfiles: [],
+      yamlBases: restBases
     };
   }
   function destroyAll() {
