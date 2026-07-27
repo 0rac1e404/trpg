@@ -2,7 +2,12 @@
  * Sync SVG files from Obsidian vault to the git repo.
  *
  * Reads all marker .md files in zoom-map-data/markers/, extracts referenced SVG
- * paths (image bases), then copies those SVGs from vault → repo notes dir.
+ * paths (image bases), then copies those SVGs from vault to two locations:
+ *   1. src/site/notes/  – for local dev / fallback
+ *   2. zoom-map-data/assets/excalidraw/  – DG-safe, committed to git
+ *
+ * The second location is NOT managed by the Digital Garden plugin, so it
+ * survives DG's publish → delete cycle.
  *
  * Usage:
  *   node scripts/sync-svgs.js
@@ -10,7 +15,7 @@
  * Config:
  *   Set VAULT_PATH env var, or edit VAULT_PATH_DEFAULT below.
  *   On Vercel / CI: skip silently (no vault available), SVGs should already be
- *   committed to the repo.
+ *   committed to the repo under zoom-map-data/assets/.
  */
 const fs = require("fs");
 const path = require("path");
@@ -20,6 +25,7 @@ const matter = require("gray-matter");
 const VAULT_PATH_DEFAULT = "E:/TEST";
 const REPO_ROOT = path.resolve(__dirname, "..");
 const NOTES_DIR = path.join(REPO_ROOT, "src", "site", "notes");
+const ASSETS_DIR = path.join(REPO_ROOT, "zoom-map-data", "assets", "excalidraw");
 
 // ── Main ───────────────────────────────────────────────────────
 
@@ -71,7 +77,17 @@ function main() {
       if (srcSize !== dstSize) {
         fs.mkdirSync(path.dirname(dstPath), { recursive: true });
         fs.copyFileSync(srcPath, dstPath);
-        console.log("[sync-svgs] Copied:", svgRel, `(${srcSize} bytes)`);
+        console.log("[sync-svgs] notes:", svgRel, `(${srcSize} bytes)`);
+        copied++;
+      }
+
+      // Also copy to zoom-map-data/assets/excalidraw/ (DG-safe location)
+      const assetDst = path.join(ASSETS_DIR, svgRel);
+      const assetSize = fs.existsSync(assetDst) ? fs.statSync(assetDst).size : -1;
+      if (srcSize !== assetSize) {
+        fs.mkdirSync(path.dirname(assetDst), { recursive: true });
+        fs.copyFileSync(srcPath, assetDst);
+        console.log("[sync-svgs] assets:", svgRel, `(${srcSize} bytes)`);
         copied++;
       }
     }

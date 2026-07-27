@@ -1,30 +1,44 @@
 /**
- * Post-build: copy excalidraw SVG files from src/site/notes into dist
- * (workaround for Eleventy passthroughCopy failing with spaces in filenames on Linux)
+ * Post-build: copy excalidraw SVG files into dist.
+ *
+ * Source: zoom-map-data/assets/excalidraw/ (DG-safe, committed to git)
+ * Dest:   dist/  (same relative path under dist)
+ *
+ * This bypasses Eleventy passthroughCopy which fails with spaces in filenames
+ * on Linux, and is immune to Digital Garden's auto-delete of SVGs.
  */
 const fs = require("fs");
 const path = require("path");
-const { globSync } = require("glob");
 
-const notesDir = path.resolve(__dirname, "..", "src", "site", "notes");
-const distDir = path.resolve(__dirname, "..", "dist");
+const repoRoot = path.resolve(__dirname, "..");
+const assetSrc = path.join(repoRoot, "zoom-map-data", "assets", "excalidraw");
+const distDir = path.join(repoRoot, "dist");
 
-const svgFiles = globSync("**/*.svg", { cwd: notesDir });
+if (!fs.existsSync(assetSrc)) {
+  console.log("  [copy-svgs] No DG-safe SVG assets directory.");
+  return;
+}
 
-for (const rel of svgFiles) {
-  const src = path.join(notesDir, rel);
-  const dest = path.join(distDir, rel);
-  const destParent = path.dirname(dest);
+// Recursively walk and copy
+function walkAndCopy(srcBase, relPath) {
+  const fullSrc = relPath ? path.join(srcBase, relPath) : srcBase;
+  const entries = fs.readdirSync(fullSrc, { withFileTypes: true });
 
-  if (!fs.existsSync(destParent)) {
-    fs.mkdirSync(destParent, { recursive: true });
+  for (const ent of entries) {
+    const childRel = relPath ? path.join(relPath, ent.name) : ent.name;
+    const childSrc = path.join(srcBase, childRel);
+
+    if (ent.isDirectory()) {
+      walkAndCopy(srcBase, childRel);
+    } else if (ent.name.toLowerCase().endsWith(".svg")) {
+      const dest = path.join(distDir, childRel);
+      fs.mkdirSync(path.dirname(dest), { recursive: true });
+      fs.copyFileSync(childSrc, dest);
+      const size = fs.statSync(dest).size;
+      console.log(`  [copy-svgs] ${childRel} → dist (${size} bytes)`);
+    }
   }
-
-  fs.copyFileSync(src, dest);
-  const stat = fs.statSync(dest);
-  console.log(`  [copy-svgs] ${rel} → ${dest} (${stat.size} bytes)`);
 }
 
-if (svgFiles.length === 0) {
-  console.log("  [copy-svgs] No SVG files found in notes.");
-}
+walkAndCopy(assetSrc, "");
+console.log("  [copy-svgs] Done.");
