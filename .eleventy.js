@@ -719,7 +719,13 @@ module.exports = function(eleventyConfig) {
   eleventyConfig.addPassthroughCopy("src/site/img");
   eleventyConfig.addPassthroughCopy("src/site/scripts");
   eleventyConfig.addPassthroughCopy("src/site/styles/_theme.*.css");
+  // SVG passthrough: copy all .svg from notes keeping dir structure
+  // e.g. src/site/notes/a/b/c.svg -> dist/a/b/c.svg
   eleventyConfig.addPassthroughCopy("src/site/notes/**/*.svg");
+  // Explicit mapping for zoom-map SVG with spaces in path
+  eleventyConfig.addPassthroughCopy({
+    "src/site/notes/TRPG规则/伯爵红茶/星图/the Vast.excalidraw.svg": "TRPG规则/伯爵红茶/星图/the Vast.excalidraw.svg",
+  });
   eleventyConfig.addPassthroughCopy({ "src/site/logo.*": "/" });
   eleventyConfig.on("eleventy.before", () => {
     normalizeFavicon(FAVICON_SOURCE, FAVICON_NORMALIZED);
