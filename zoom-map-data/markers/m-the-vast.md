@@ -5,7 +5,7 @@ sourceFile: TRPG规则/伯爵红茶/星图/the Vast.excalidraw.markers.json
 
 # Zoom Map markers data
 
-\json
+```json
 {
   "size": {
     "w": 1308,
@@ -58,4 +58,4 @@ sourceFile: TRPG规则/伯爵红茶/星图/the Vast.excalidraw.markers.json
   },
   "textLayers": []
 }
-\\n
+```

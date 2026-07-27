@@ -122,8 +122,8 @@ function userEleventySetup(eleventyConfig) {
         return content;
       }
 
-      var parsed = matter(raw);
-      if (!parsed.data["dg-map"] && !parsed.data.dgMap) return content;
+      // Auto-detect: if the page contains a zoommap code block, inject the script
+      if (!raw.includes("```zoommap") && !raw.includes("``` zoommap")) return content;
 
       // Extract markers paths from zoommap code blocks
       var markersPaths = extractMarkersPaths(raw);

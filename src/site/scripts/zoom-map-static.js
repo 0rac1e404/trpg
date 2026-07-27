@@ -690,18 +690,24 @@
       const value = trimmed.substring(idx + 1).trim();
       map[key] = value;
     }
-    const imageUrl = imageBases.length > 0 ? imageBases[0] : map.image;
+    function normPath(p) {
+      const t = p.trim();
+      if (!t || t.startsWith("/") || t.startsWith("http://") || t.startsWith("https://") || t.startsWith("data:")) return t;
+      return "/" + t;
+    }
+    const imageUrl = imageBases.length > 0 ? normPath(imageBases[0]) : map.image ? normPath(map.image) : void 0;
     if (!imageUrl || !map.markers) return null;
+    const markersUrl = normPath(map.markers);
     const imgW = parseFloat((_a = map.imgW) != null ? _a : "0") || void 0;
     const imgH = parseFloat((_b = map.imgH) != null ? _b : "0") || void 0;
     const restBases = imageBases.length > 1 ? imageBases.slice(1).map((p, i) => ({
-      path: p,
-      url: p,
+      path: normPath(p),
+      url: normPath(p),
       name: `Base ${i + 2}`
     })) : void 0;
     return {
       imageUrl,
-      markersUrl: map.markers,
+      markersUrl,
       minZoom: parseFloat((_c = map.minZoom) != null ? _c : "0.1"),
       maxZoom: parseFloat((_d = map.maxZoom) != null ? _d : "10"),
       imgW: imgW != null ? imgW : 800,
