@@ -1,14 +1,8 @@
 ---
-publish: true
-ttrpgtools: ttrpgtools-publish
-ttrpgtoolsData: markers
 zoommapMarkersPath: TRPG规则/伯爵红茶/星图/Drawing 2026-07-24 19.02.19.excalidraw.svg.markers.json
 sourceFile: TRPG规则/伯爵红茶/星图/Drawing 2026-07-24 19.02.19.excalidraw.svg.markers.json
-zoommapSourceMtime: 1784912622649
-zoommapTextLayerRasterEnabled: false
-generatedAt: 2026-07-24T17:08:21.591Z
-dg-publish: true
 ---
+
 
 # TTRPG Tools: Maps publish data (markers)
 

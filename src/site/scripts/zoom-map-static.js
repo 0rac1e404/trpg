@@ -22,6 +22,64 @@
     return d.innerHTML;
   }
   var pagePreviewCache = /* @__PURE__ */ new Map();
+  function sanitizeHtml(html) {
+    const div = document.createElement("div");
+    div.innerHTML = html;
+    for (const el2 of div.querySelectorAll("script, style, iframe, object, embed, link, svg")) el2.remove();
+    for (const el2 of div.querySelectorAll("*")) {
+      for (const attr of [...el2.attributes]) {
+        if (attr.name.startsWith("on")) el2.removeAttribute(attr.name);
+        if (attr.name === "href" && /^javascript:/i.test(attr.value)) el2.removeAttribute(attr.name);
+      }
+    }
+    return div.innerHTML;
+  }
+  function truncateHtml(html, maxChars) {
+    const div = document.createElement("div");
+    div.innerHTML = html;
+    let count = 0;
+    const walker = document.createTreeWalker(div, NodeFilter.SHOW_TEXT);
+    let node = walker.nextNode();
+    while (node) {
+      const text = node.textContent || "";
+      const remaining = maxChars - count;
+      if (remaining <= 0) {
+        node.textContent = "";
+        const next = walker.nextNode();
+        if (next) {
+          let parent = next;
+          while (parent && parent !== div) {
+            let sibling = parent.nextSibling;
+            while (sibling) {
+              const s = sibling;
+              sibling = sibling.nextSibling;
+              s.remove();
+            }
+            parent = parent.parentNode;
+          }
+          next.textContent = "";
+        }
+        return div.innerHTML;
+      }
+      if (count + text.length > remaining) {
+        node.textContent = text.slice(0, remaining) + "\u2026";
+        let parent = node;
+        while (parent && parent !== div) {
+          let sibling = parent.nextSibling;
+          while (sibling) {
+            const s = sibling;
+            sibling = sibling.nextSibling;
+            s.remove();
+          }
+          parent = parent.parentNode;
+        }
+        return div.innerHTML;
+      }
+      count += text.length;
+      node = walker.nextNode();
+    }
+    return div.innerHTML;
+  }
   async function fetchPagePreview(url) {
     if (pagePreviewCache.has(url)) return pagePreviewCache.get(url);
     try {
@@ -31,28 +89,24 @@
       const parser = new DOMParser();
       const doc = parser.parseFromString(html, "text/html");
       const contentEl = doc.querySelector(".content") || doc.querySelector("article") || doc.querySelector("main");
-      const h1El = doc.querySelector("h1");
-      let text = "";
-      if (h1El) text += (h1El.textContent || "").trim();
-      if (contentEl) {
-        const bodyText = (contentEl.textContent || "").trim();
-        const normalized = bodyText.replace(/\s+/g, " ").trim();
-        const snippet = normalized.slice(0, 300);
-        if (text) text += "\n";
-        text += snippet;
-        if (normalized.length > 300) text += "\u2026";
+      if (!contentEl) {
+        pagePreviewCache.set(url, "");
+        return "";
       }
-      const result = text || "\uFF08\u9875\u9762\u5185\u5BB9\u4E3A\u7A7A\uFF09";
-      pagePreviewCache.set(url, result);
-      return result;
+      const clone = contentEl.cloneNode(true);
+      for (const h of clone.querySelectorAll("h1, h2")) h.remove();
+      for (const el2 of clone.querySelectorAll("nav, aside, footer, header")) el2.remove();
+      const sanitized = sanitizeHtml(clone.innerHTML);
+      const truncated = truncateHtml(sanitized, 400);
+      pagePreviewCache.set(url, truncated);
+      return truncated;
     } catch (_err) {
-      const fallback = "\uFF08\u65E0\u6CD5\u52A0\u8F7D\u9884\u89C8\uFF09";
-      pagePreviewCache.set(url, fallback);
-      return fallback;
+      pagePreviewCache.set(url, "");
+      return "";
     }
   }
   var globalActiveTip = null;
-  function buildTooltipContent(m, previewText) {
+  function buildTooltipContent(m, previewHtml) {
     const hasTooltip = !!m.tooltip;
     const hasLink = !!m.link;
     let html = "";
@@ -64,8 +118,10 @@
       const url = normalizeLink(m.link);
       if (hasTooltip) html += '<hr style="margin:4px 0;border-color:rgba(255,255,255,0.15);">';
       html += `<a class="zm-st-tooltip-link" href="${escapeHtml(url)}" style="color:#8cb4ff;text-decoration:underline;display:flex;align-items:center;gap:5px;margin-bottom:4px;"><img src="/img/zoom-map-icons/anchor.svg" alt="" style="width:14px;height:14px;flex-shrink:0;">${escapeHtml(name)}</a>`;
-      if (previewText !== void 0) {
-        html += `<div class="zm-st-preview-text" style="font-size:12px;line-height:1.5;opacity:0.85;max-height:150px;overflow-y:auto;">${escapeHtml(previewText)}</div>`;
+      if (previewHtml !== void 0) {
+        if (previewHtml) {
+          html += `<div class="zm-st-preview-html" style="max-height:160px;overflow-y:auto;word-break:break-word;">${previewHtml}</div>`;
+        }
       } else {
         html += `<div class="zm-st-preview-text zm-st-preview-loading" style="font-size:12px;opacity:0.55;">\u52A0\u8F7D\u9884\u89C8\u4E2D\u2026</div>`;
       }
@@ -90,6 +146,83 @@
     if (attrs) for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v);
     parent.appendChild(e);
     return e;
+  }
+  var previewCssInjected = false;
+  function injectPreviewCss() {
+    if (previewCssInjected) return;
+    previewCssInjected = true;
+    const style = document.createElement("style");
+    style.id = "zm-st-preview-css";
+    style.textContent = `
+/* Zoom Map static \u2013 tooltip preview typography (matches site theme) */
+.zm-st-tooltip .zm-st-preview-html {
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: #d0d0d0;
+}
+.zm-st-tooltip .zm-st-preview-html p {
+  margin: 0 0 5px 0;
+  line-height: 1.55;
+}
+.zm-st-tooltip .zm-st-preview-html p:last-child {
+  margin-bottom: 0;
+}
+.zm-st-tooltip .zm-st-preview-html strong,
+.zm-st-tooltip .zm-st-preview-html b {
+  color: #e6e6e6;
+  font-weight: 600;
+}
+.zm-st-tooltip .zm-st-preview-html em,
+.zm-st-tooltip .zm-st-preview-html i {
+  color: #c8c8c8;
+}
+.zm-st-tooltip .zm-st-preview-html a {
+  color: #8cb4ff;
+}
+.zm-st-tooltip .zm-st-preview-html h3,
+.zm-st-tooltip .zm-st-preview-html h4,
+.zm-st-tooltip .zm-st-preview-html h5,
+.zm-st-tooltip .zm-st-preview-html h6 {
+  font-size: 13px;
+  font-weight: 600;
+  margin: 7px 0 3px;
+  color: #e0e0e0;
+}
+.zm-st-tooltip .zm-st-preview-html ul,
+.zm-st-tooltip .zm-st-preview-html ol {
+  padding-left: 16px;
+  margin: 4px 0;
+}
+.zm-st-tooltip .zm-st-preview-html li {
+  margin-bottom: 2px;
+}
+.zm-st-tooltip .zm-st-preview-html ul li::marker,
+.zm-st-tooltip .zm-st-preview-html ol li::marker {
+  color: #999;
+}
+.zm-st-tooltip .zm-st-preview-html blockquote {
+  border-left: 3px solid rgba(255,255,255,0.22);
+  padding-left: 10px;
+  margin: 6px 0;
+  opacity: 0.85;
+  color: #bbb;
+}
+.zm-st-tooltip .zm-st-preview-html hr {
+  border-color: rgba(255,255,255,0.12);
+  margin: 6px 0;
+}
+.zm-st-tooltip .zm-st-preview-html del,
+.zm-st-tooltip .zm-st-preview-html s {
+  opacity: 0.6;
+}
+.zm-st-tooltip .zm-st-preview-html mark {
+  background: rgba(255,200,80,0.25);
+  color: #f0d060;
+  padding: 0 2px;
+  border-radius: 2px;
+}
+`;
+    document.head.appendChild(style);
   }
   var StaticMap = class {
     /* ---- lifecycle ---- */
@@ -236,6 +369,7 @@
         this.zoomAt(1.5, e.clientX - r.left, e.clientY - r.top);
       };
       var _a;
+      injectPreviewCss();
       this.container = container;
       container.classList.add("zm-static-root");
       this.cfg = this.loadConfig(container);
@@ -568,10 +702,10 @@
       if (m.link) {
         const url = normalizeLink(m.link);
         const capturedId = id;
-        fetchPagePreview(url).then((previewText) => {
+        fetchPagePreview(url).then((previewHtml) => {
           if (this.tooltipMarkerId !== capturedId || !this.tooltipEl) return;
           this.tooltipPreviewFetched = true;
-          this.tooltipEl.innerHTML = buildTooltipContent(m, previewText);
+          this.tooltipEl.innerHTML = buildTooltipContent(m, previewHtml);
           this.repositionTooltip(host);
         });
       }
