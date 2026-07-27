@@ -10,6 +10,17 @@
     if (!p.endsWith("/") && !/\.[a-zA-Z0-9]+$/.test(p)) p += "/";
     return p;
   }
+  function pageName(link) {
+    if (!link) return "";
+    const segments = link.replace(/\\/g, "/").split("/");
+    const last = segments[segments.length - 1] || "";
+    return last.replace(/\.md$/i, "") || link;
+  }
+  function escapeHtml(s) {
+    const d = document.createElement("div");
+    d.textContent = s;
+    return d.innerHTML;
+  }
   function el(tag, parent, attrs, cls) {
     const e = parent.ownerDocument.createElement(tag);
     if (cls) e.className = cls;
@@ -456,7 +467,7 @@
             window.open(normalizeLink(m.link), "_self");
           });
         }
-        if (m.tooltip) {
+        if (m.tooltip || m.link) {
           host.addEventListener("mouseenter", () => this.showTooltip(host, m));
           host.addEventListener("mouseleave", () => this.hideTooltip());
         }
@@ -472,13 +483,27 @@
           window.open(normalizeLink(m.link), "_self");
         });
       }
+      if (m.tooltip || m.link) {
+        dot.addEventListener("mouseenter", () => this.showTooltip(dot, m));
+        dot.addEventListener("mouseleave", () => this.hideTooltip());
+      }
     }
     showTooltip(host, m) {
-      var _a;
       this.hideTooltip();
       const tip = el("div", document.body, {}, "zm-st-tooltip");
-      tip.textContent = (_a = m.tooltip) != null ? _a : "";
-      tip.style.cssText = "position:fixed;z-index:99999;background:rgba(0,0,0,0.85);color:#fff;padding:6px 10px;border-radius:4px;font-size:13px;pointer-events:none;white-space:nowrap;font-family:sans-serif;";
+      const hasTooltip = !!m.tooltip;
+      const hasLink = !!m.link;
+      let html = "";
+      if (hasTooltip) {
+        html += `<span class="zm-st-tooltip-label" style="white-space:nowrap;">${escapeHtml(m.tooltip)}</span>`;
+      }
+      if (hasLink) {
+        const name = pageName(m.link);
+        const url = normalizeLink(m.link);
+        html += `<a class="zm-st-tooltip-link" href="${escapeHtml(url)}" style="color:#8cb4ff;text-decoration:underline;white-space:nowrap;">\u{1F517} ${escapeHtml(name)}</a>`;
+      }
+      tip.innerHTML = html;
+      tip.style.cssText = "position:fixed;z-index:99999;background:rgba(0,0,0,0.88);color:#fff;padding:8px 12px;border-radius:6px;font-size:13px;pointer-events:none;font-family:sans-serif;display:flex;flex-direction:column;gap:4px;max-width:240px;";
       this.tooltipEl = tip;
       this.repositionTooltip(host);
     }
@@ -668,6 +693,29 @@
     const p = path.startsWith("/") ? path.slice(1) : path;
     return "zm-data-" + btoa(unescape(encodeURIComponent(p))).replace(/[+/=]/g, "_");
   }
+  var DEFAULT_ICONS = [
+    {
+      key: "port",
+      url: "/img/zoom-map-icons/anchor.svg",
+      size: 24,
+      anchorX: 12,
+      anchorY: 12
+    },
+    {
+      key: "pinRed",
+      url: "data:image/svg+xml;charset=UTF-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2224%22%20height%3D%2224%22%20viewBox%3D%220%200%2024%2024%22%3E%3Cpath%20fill%3D%22%23d23c3c%22%20d%3D%22M12%202a7%207%200%200%200-7%207c0%205.25%207%2013%207%2013s7-7.75%207-13a7%207%200%200%200-7-7m0%209.5A2.5%202.5%200%201%201%2012%206.5a2.5%202.5%200%200%201%200%205Z%22%2F%3E%3C%2Fsvg%3E",
+      size: 24,
+      anchorX: 12,
+      anchorY: 12
+    },
+    {
+      key: "pinBlue",
+      url: "data:image/svg+xml;charset=UTF-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2224%22%20height%3D%2224%22%20viewBox%3D%220%200%2024%2024%22%3E%3Cpath%20fill%3D%22%233c62d2%22%20d%3D%22M12%202a7%207%200%200%200-7%207c0%205.25%207%2013%207%2013s7-7.75%207-13a7%207%200%200%200-7-7m0%209.5A2.5%202.5%200%201%201%2012%206.5a2.5%202.5%200%200%201%200%205Z%22%2F%3E%3C%2Fsvg%3E",
+      size: 24,
+      anchorX: 12,
+      anchorY: 12
+    }
+  ];
   function parseZoommapYaml(text) {
     var _a, _b, _c, _d;
     const lines = text.split("\n");
@@ -727,7 +775,7 @@
       height: map.height,
       align: map.align,
       initialZoom: map.initialZoom ? parseFloat(map.initialZoom) : void 0,
-      iconProfiles: [],
+      iconProfiles: DEFAULT_ICONS,
       yamlBases: restBases
     };
   }
