@@ -655,7 +655,8 @@
     }
   }
   function safeDataId(path) {
-    return "zm-data-" + btoa(unescape(encodeURIComponent(path))).replace(/[+/=]/g, "_");
+    const p = path.startsWith("/") ? path.slice(1) : path;
+    return "zm-data-" + btoa(unescape(encodeURIComponent(p))).replace(/[+/=]/g, "_");
   }
   function parseZoommapYaml(text) {
     var _a, _b, _c, _d;
