@@ -21,6 +21,56 @@
     d.textContent = s;
     return d.innerHTML;
   }
+  var pagePreviewCache = /* @__PURE__ */ new Map();
+  async function fetchPagePreview(url) {
+    if (pagePreviewCache.has(url)) return pagePreviewCache.get(url);
+    try {
+      const resp = await fetch(url);
+      if (!resp.ok) throw new Error("HTTP " + resp.status);
+      const html = await resp.text();
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(html, "text/html");
+      const contentEl = doc.querySelector(".content") || doc.querySelector("article") || doc.querySelector("main");
+      const h1El = doc.querySelector("h1");
+      let text = "";
+      if (h1El) text += (h1El.textContent || "").trim();
+      if (contentEl) {
+        const bodyText = (contentEl.textContent || "").trim();
+        const snippet = bodyText.slice(0, 300);
+        if (text) text += "\n";
+        text += snippet;
+        if (bodyText.length > 300) text += "\u2026";
+      }
+      const result = text || "\uFF08\u9875\u9762\u5185\u5BB9\u4E3A\u7A7A\uFF09";
+      pagePreviewCache.set(url, result);
+      return result;
+    } catch (_err) {
+      const fallback = "\uFF08\u65E0\u6CD5\u52A0\u8F7D\u9884\u89C8\uFF09";
+      pagePreviewCache.set(url, fallback);
+      return fallback;
+    }
+  }
+  var globalActiveTip = null;
+  function buildTooltipContent(m, previewText) {
+    const hasTooltip = !!m.tooltip;
+    const hasLink = !!m.link;
+    let html = "";
+    if (hasTooltip) {
+      html += `<span class="zm-st-tooltip-label" style="white-space:nowrap;font-weight:600;">${escapeHtml(m.tooltip)}</span>`;
+    }
+    if (hasLink) {
+      const name = pageName(m.link);
+      const url = normalizeLink(m.link);
+      if (hasTooltip) html += '<hr style="margin:4px 0;border-color:rgba(255,255,255,0.15);">';
+      html += `<a class="zm-st-tooltip-link" href="${escapeHtml(url)}" style="color:#8cb4ff;text-decoration:underline;display:block;margin-bottom:4px;">\u{1F4C4} ${escapeHtml(name)}</a>`;
+      if (previewText !== void 0) {
+        html += `<div class="zm-st-preview-text" style="font-size:12px;line-height:1.5;opacity:0.85;white-space:pre-wrap;max-height:150px;overflow-y:auto;">${escapeHtml(previewText)}</div>`;
+      } else {
+        html += `<div class="zm-st-preview-text zm-st-preview-loading" style="font-size:12px;opacity:0.55;">\u52A0\u8F7D\u9884\u89C8\u4E2D\u2026</div>`;
+      }
+    }
+    return html;
+  }
   function el(tag, parent, attrs, cls) {
     const e = parent.ownerDocument.createElement(tag);
     if (cls) e.className = cls;
@@ -68,8 +118,13 @@
       /* marker hover / popover */
       this.activePopover = null;
       this.activeMarkerEl = null;
-      /* ---- tooltip ---- */
+      /* ---- tooltip with page-content preview ---- */
       this.tooltipEl = null;
+      this.tooltipHost = null;
+      /** Unique id per marker so we can discard stale async preview responses */
+      this.tooltipMarkerId = "";
+      this.tooltipTimer = null;
+      this.tooltipPreviewFetched = false;
       this.handleResize = () => {
         if (!this.ready) return;
         if (this.cfg.responsive) {
@@ -489,36 +544,73 @@
       }
     }
     showTooltip(host, m) {
-      this.hideTooltip();
+      if (this.tooltipTimer) {
+        clearTimeout(this.tooltipTimer);
+        this.tooltipTimer = null;
+      }
+      if (this.tooltipEl && this.tooltipMarkerId === (m.id || "")) return;
+      this.disposeTooltip();
+      const id = m.id || "marker-" + Math.random().toString(36).slice(2);
+      this.tooltipMarkerId = id;
+      this.tooltipHost = host;
+      this.tooltipPreviewFetched = false;
       const tip = el("div", document.body, {}, "zm-st-tooltip");
-      const hasTooltip = !!m.tooltip;
-      const hasLink = !!m.link;
-      let html = "";
-      if (hasTooltip) {
-        html += `<span class="zm-st-tooltip-label" style="white-space:nowrap;">${escapeHtml(m.tooltip)}</span>`;
-      }
-      if (hasLink) {
-        const name = pageName(m.link);
-        const url = normalizeLink(m.link);
-        html += `<a class="zm-st-tooltip-link" href="${escapeHtml(url)}" style="color:#8cb4ff;text-decoration:underline;white-space:nowrap;">\u{1F517} ${escapeHtml(name)}</a>`;
-      }
-      tip.innerHTML = html;
-      tip.style.cssText = "position:fixed;z-index:99999;background:rgba(0,0,0,0.88);color:#fff;padding:8px 12px;border-radius:6px;font-size:13px;pointer-events:none;font-family:sans-serif;display:flex;flex-direction:column;gap:4px;max-width:240px;";
+      tip.innerHTML = buildTooltipContent(m);
+      tip.style.cssText = "position:fixed;z-index:99999;background:rgba(0,0,0,0.92);color:#fff;padding:10px 14px;border-radius:8px;font-size:13px;pointer-events:none;font-family:sans-serif;display:flex;flex-direction:column;gap:4px;max-width:380px;box-shadow:0 4px 16px rgba(0,0,0,0.45);";
       this.tooltipEl = tip;
+      if (globalActiveTip && globalActiveTip.tip !== tip) {
+        globalActiveTip.tip.remove();
+      }
+      globalActiveTip = { tip, markerId: id };
       this.repositionTooltip(host);
+      if (m.link) {
+        const url = normalizeLink(m.link);
+        const capturedId = id;
+        fetchPagePreview(url).then((previewText) => {
+          if (this.tooltipMarkerId !== capturedId || !this.tooltipEl) return;
+          this.tooltipPreviewFetched = true;
+          this.tooltipEl.innerHTML = buildTooltipContent(m, previewText);
+          this.repositionTooltip(host);
+        });
+      }
     }
     repositionTooltip(host) {
       if (!this.tooltipEl) return;
       const r = host.getBoundingClientRect();
-      this.tooltipEl.style.left = `${r.left + r.width / 2}px`;
-      this.tooltipEl.style.top = `${r.top - 30}px`;
-      this.tooltipEl.style.transform = "translate(-50%, 0)";
+      let left = r.left + r.width / 2;
+      let top = r.top - 10;
+      const tw = this.tooltipEl.offsetWidth;
+      const th = this.tooltipEl.offsetHeight;
+      if (left - tw / 2 < 4) left = tw / 2 + 4;
+      if (left + tw / 2 > window.innerWidth - 4) left = window.innerWidth - tw / 2 - 4;
+      if (top < 4) top = r.bottom + 10;
+      if (top + th > window.innerHeight - 4) top = window.innerHeight - th - 4;
+      this.tooltipEl.style.left = `${left}px`;
+      this.tooltipEl.style.top = `${top}px`;
+      this.tooltipEl.style.transform = "translate(-50%, -100%)";
     }
     hideTooltip() {
+      if (this.tooltipTimer) clearTimeout(this.tooltipTimer);
+      this.tooltipTimer = setTimeout(() => {
+        this.disposeTooltip();
+        this.tooltipTimer = null;
+      }, 150);
+    }
+    disposeTooltip() {
+      if (this.tooltipTimer) {
+        clearTimeout(this.tooltipTimer);
+        this.tooltipTimer = null;
+      }
       if (this.tooltipEl) {
         this.tooltipEl.remove();
         this.tooltipEl = null;
       }
+      if (globalActiveTip) {
+        globalActiveTip = null;
+      }
+      this.tooltipMarkerId = "";
+      this.tooltipHost = null;
+      this.tooltipPreviewFetched = false;
     }
     /* ---- popover ---- */
     closePopover() {
