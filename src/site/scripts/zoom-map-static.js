@@ -2,6 +2,14 @@
 (() => {
   // src/static-render.ts
   var NS = "http://www.w3.org/2000/svg";
+  function normalizeLink(link) {
+    if (!link) return link;
+    if (link.startsWith("http://") || link.startsWith("https://") || link.startsWith("#")) return link;
+    let p = link.replace(/\.md$/i, "");
+    if (!p.startsWith("/")) p = "/" + p;
+    if (!p.endsWith("/") && !/\.[a-zA-Z0-9]+$/.test(p)) p += "/";
+    return p;
+  }
   function el(tag, parent, attrs, cls) {
     const e = parent.ownerDocument.createElement(tag);
     if (cls) e.className = cls;
@@ -32,9 +40,10 @@
       this.scale = 1;
       this.tx = 0;
       this.ty = 0;
-      this.imgW = 800;
-      this.imgH = 600;
+      this.imgW = 0;
+      this.imgH = 0;
       this.ready = false;
+      this.imgLoaded = false;
       /* grid */
       this.gridSvg = null;
       this.gridStaticLayer = null;
@@ -164,8 +173,8 @@
       container.classList.add("zm-static-root");
       this.cfg = this.loadConfig(container);
       this.markers = this.loadMarkers(container);
-      this.imgW = this.cfg.imgW || 800;
-      this.imgH = this.cfg.imgH || 600;
+      this.imgW = this.cfg.imgW || 0;
+      this.imgH = this.cfg.imgH || 0;
       for (const ip of this.cfg.iconProfiles) this.iconMap.set(ip.key, ip);
       this.overlays = (_a = this.cfg.overlays) != null ? _a : [];
       this.buildDom();
@@ -224,8 +233,8 @@
       return {
         imageUrl,
         markersUrl,
-        imgW: parseFloat((_c = get("imgw")) != null ? _c : "800"),
-        imgH: parseFloat((_d = get("imgh")) != null ? _d : "600"),
+        imgW: parseFloat((_c = get("imgw")) != null ? _c : "0") || 0,
+        imgH: parseFloat((_d = get("imgh")) != null ? _d : "0") || 0,
         minZoom: parseFloat((_e = get("minzoom")) != null ? _e : "0.1"),
         maxZoom: parseFloat((_f = get("maxzoom")) != null ? _f : "10"),
         width: (_g = get("width")) != null ? _g : void 0,
@@ -316,6 +325,7 @@
             this.imgW = this.imgEl.naturalWidth;
             this.imgH = this.imgEl.naturalHeight;
           }
+          this.imgLoaded = true;
           this.world.style.width = `${this.imgW}px`;
           this.world.style.height = `${this.imgH}px`;
           resolve();
@@ -443,7 +453,7 @@
           host.style.cursor = "pointer";
           host.addEventListener("click", (e) => {
             e.stopPropagation();
-            window.open(m.link, "_self");
+            window.open(normalizeLink(m.link), "_self");
           });
         }
         if (m.tooltip) {
@@ -459,7 +469,7 @@
       if (m.link) {
         dot.addEventListener("click", (e) => {
           e.stopPropagation();
-          window.open(m.link, "_self");
+          window.open(normalizeLink(m.link), "_self");
         });
       }
     }
@@ -699,8 +709,8 @@
     const imageUrl = imageBases.length > 0 ? normPath(imageBases[0]) : map.image ? normPath(map.image) : void 0;
     if (!imageUrl || !map.markers) return null;
     const markersUrl = normPath(map.markers);
-    const imgW = parseFloat((_a = map.imgW) != null ? _a : "0") || void 0;
-    const imgH = parseFloat((_b = map.imgH) != null ? _b : "0") || void 0;
+    const explicitW = parseFloat((_a = map.imgW) != null ? _a : "0") || void 0;
+    const explicitH = parseFloat((_b = map.imgH) != null ? _b : "0") || void 0;
     const restBases = imageBases.length > 1 ? imageBases.slice(1).map((p, i) => ({
       path: normPath(p),
       url: normPath(p),
@@ -711,8 +721,8 @@
       markersUrl,
       minZoom: parseFloat((_c = map.minZoom) != null ? _c : "0.1"),
       maxZoom: parseFloat((_d = map.maxZoom) != null ? _d : "10"),
-      imgW: imgW != null ? imgW : 800,
-      imgH: imgH != null ? imgH : 600,
+      imgW: explicitW,
+      imgH: explicitH,
       width: map.width,
       height: map.height,
       align: map.align,
