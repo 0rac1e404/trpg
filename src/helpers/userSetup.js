@@ -3,10 +3,11 @@ const path = require("path");
 const matter = require("gray-matter");
 
 // ============================================================
-// Zoom Map: set your Obsidian vault root path
-// Change this if your vault is NOT at E:/TEST
+// Zoom Map data: stored in repo at <repoRoot>/zoom-map-data/
+// To update: copy {vault}/ZoomMap/publish/* → zoom-map-data/
+//   e.g. robocopy E:\TEST\ZoomMap\publish E:\git\trpg\zoom-map-data /E
 // ============================================================
-const ZM_VAULT_PATH = "E:/TEST";
+const ZM_DATA_DIR = path.resolve(__dirname, "..", "..", "zoom-map-data");
 
 // FNV-1a 32-bit hash (same as TTRPG-Tools-Publish plugin)
 function fnv1a32(input) {
@@ -33,7 +34,7 @@ function hashPathToId(p) {
 
 // Read JSON from a vault data note (markdown with frontmatter + ```json block)
 function readMapData(vaultRelPath) {
-  var fullPath = path.join(ZM_VAULT_PATH, vaultRelPath);
+  var fullPath = path.join(ZM_DATA_DIR, vaultRelPath);
   if (!fs.existsSync(fullPath)) return null;
   var raw = fs.readFileSync(fullPath, "utf8");
 
