@@ -1,3079 +1,695 @@
 "use strict";
 (() => {
-  // src/publishTemplates.ts
-  var ZM_BEGIN_JS = "// BEGIN TTRPGTOOLS_ZOOMMAP_PUBLISH";
-  var ZM_END_JS = "// END TTRPGTOOLS_ZOOMMAP_PUBLISH";
-  function escapeForJsComment(s) {
-    return String(s).replace(/\*\//g, "* /");
+  // src/static-render.ts
+  var NS = "http://www.w3.org/2000/svg";
+  function el(tag, parent, attrs, cls) {
+    const e = parent.ownerDocument.createElement(tag);
+    if (cls) e.className = cls;
+    if (attrs) for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v);
+    parent.appendChild(e);
+    return e;
   }
-  function buildPublishJsBlock(buildStamp, opts) {
-    const hideNavFolders = Array.isArray(opts?.hideNavFolders) ? opts?.hideNavFolders ?? [] : [];
-    const mapRoot = String(opts?.mapRoot ?? "ZoomMap/publish").trim() || "ZoomMap/publish";
-    const timelineRoot = String(opts?.timelineRoot ?? "Timeline/publish").trim() || "Timeline/publish";
-    const hoverPopoverMaxWidth = String(opts?.hoverPopoverMaxWidth ?? "720px").trim() || "720px";
-    const js = [
-      ZM_BEGIN_JS,
-      "",
-      "/* ZoomMap Publish runtime (generated). Build: " + escapeForJsComment(buildStamp) + " */",
-      "(function(){",
-      "  'use strict';",
-      "",
-      "  // Publish data note locations (generated, configurable via plugin settings)",
-      "  var MAP_ROOT = " + JSON.stringify(mapRoot) + ";",
-      "  var LIB_NOTE = MAP_ROOT + '/library';",
-      "  var MARKERS_PREFIX = MAP_ROOT + '/markers/m-';",
-      "",
-      "  var TL_ROOT = " + JSON.stringify(timelineRoot) + ";",
-      "  var TL_PREFIX = TL_ROOT + '/timelines/t-';",
-      "",
-      "  var HOVER_POPOVER_MAX_WIDTH = " + JSON.stringify(hoverPopoverMaxWidth) + ";",
-      "  var HIDE_NAV_FOLDERS = " + JSON.stringify(hideNavFolders) + ";",
-      "",
-      "  var STATE = window.__TTRPG_ZOOMMAP_PUBLISH__ || (window.__TTRPG_ZOOMMAP_PUBLISH__ = {",
-      "    inited: new WeakSet(),",
-      "    libraryPromise: null,",
-      "    library: null,",
-      "    textCache: new Map(),",
-      "    noteJsonCache: new Map(),",
-      "    tintedSvgCache: new Map(),",
-      "    raf: 0",
-      "  });",
-      "",
-      "  var SITE_BASE = (function(){",
-      "    var origin = window.location.origin;",
-      "    var host = window.location.hostname;",
-      "    if(host === ('publish' + '.' + 'obsidian' + '.md')){",
-      "      var seg = (window.location.pathname.split('/').filter(Boolean)[0] || '').trim();",
-      "      if(seg) return origin + '/' + seg + '/';",
-      "    }",
-      "    return origin + '/';",
-      "  })();",
-      "",
-      "  function clamp(n,min,max){return Math.min(Math.max(n,min),max);}",
-      "  function isNum(x){return typeof x==='number' && isFinite(x);}",
-      "  function isSvgDataUrl(src){",
-      "    var s=String(src||'');",
-      "    return s.indexOf('data:image/svg+xml')===0;",
-      "  }",
-      "  function numOr(x, fallback){",
-      "    var n = (typeof x==='number') ? x : Number(String(x||'').replace(',', '.'));",
-      "    return (isFinite(n) ? n : fallback);",
-      "  }",
-      "  function tintSvgMarkup(svg,color){",
-      "    var c=String(color||'').trim();",
-      "    if(!c) return svg;",
-      "    var s=String(svg||'');",
-      `    s = s.replace(/fill="[^"]*"/gi, 'fill="'+c+'"');`,
-      `    s = s.replace(/stroke="[^"]*"/gi, 'stroke="'+c+'"');`,
-      '    if(!/fill="/i.test(s)){',
-      `      s = s.replace(/<svg([^>]*?)>/i, '<svg$1 fill="'+c+'">');`,
-      "    }",
-      "    return s;",
-      "  }",
-      "  function getTintedSvgDataUrl(baseDataUrl,color){",
-      "    var src=String(baseDataUrl||'');",
-      "    var c=String(color||'').trim();",
-      "    if(!c) return src;",
-      "    if(!isSvgDataUrl(src)) return src;",
-      "    var key=src+'||'+c;",
-      "    if(STATE.tintedSvgCache && STATE.tintedSvgCache.has(key)) return STATE.tintedSvgCache.get(key);",
-      "    var idx=src.indexOf(',');",
-      "    if(idx<0) return src;",
-      "    var header=src.slice(0, idx+1);",
-      "    if(header.toLowerCase().indexOf(';base64')>=0) return src;",
-      "    var payload=src.slice(idx+1);",
-      "    var svg='';",
-      "    try{ svg=decodeURIComponent(payload); }catch(_e){ return src; }",
-      "    var tinted=tintSvgMarkup(svg,c);",
-      "    var out=header + encodeURIComponent(tinted);",
-      "    if(STATE.tintedSvgCache) STATE.tintedSvgCache.set(key,out);",
-      "    return out;",
-      "  }",
-      "  function isLikelyMobile(){",
-      "    try{",
-      "      var ua = (navigator && navigator.userAgent) ? navigator.userAgent : '';",
-      "      if(/Mobi|Android|iPhone|iPad|iPod/i.test(ua)) return true;",
-      "      if(window.matchMedia){",
-      "        if(window.matchMedia('(pointer: coarse)').matches) return true;",
-      "        if(window.matchMedia('(max-width: 820px)').matches) return true;",
-      "      }",
-      "    }catch(_e){}",
-      "    return false;",
-      "  }",
-      "",
-      "  var HIDDEN_LAYER_PREFIXES = ['hidden','hide','secret'];",
-      "  function isHiddenLayerName(name){",
-      "    var s = String(name||'').trim().toLowerCase();",
-      "    if(!s) return false;",
-      "    for(var i=0;i<HIDDEN_LAYER_PREFIXES.length;i++){",
-      "      var p = HIDDEN_LAYER_PREFIXES[i];",
-      "      if(s === p) return true;",
-      "      if(s.startsWith(p)){",
-      "        var ch = s.charAt(p.length);",
-      "        // Hide..., Hidden - DM, Secret: etc. (but not 'hideout')",
-      "        if(ch && !/[a-z0-9]/i.test(ch)) return true;",
-      "      }",
-      "    }",
-      "    return false;",
-      "  }",
-      "  function stripQuotes(s){",
-      "    var t=(s||'').trim();",
-      `    if((t.startsWith('"') && t.endsWith('"')) || (t.startsWith("'") && t.endsWith("'"))) return t.slice(1,-1);`,
-      "    return t;",
-      "  }",
-      "",
-      "  function stripQuotePrefix(line){",
-      "    var s=line||'';",
-      "    for(;;){",
-      "      var m=/^\\s*>\\s*/.exec(s);",
-      "      if(!m) break;",
-      "      s=s.slice(m[0].length);",
-      "    }",
-      "    return s;",
-      "  }",
-      "",
-      "  function normalizeNavPrefix(s){",
-      "    var p=String(s||'').trim();",
-      "    if(!p) return '';",
-      "    p=p.replace(/\\\\/g,'/');",
-      "    p=p.replace(/^\\/+/, '');",
-      "    p=p.replace(/\\/{2,}/g,'/');",
-      "    p=p.replace(/\\/+$/, '');",
-      "    return p.toLowerCase();",
-      "  }",
-      "  function shouldHideNavPath(path){",
-      "    var p=normalizeNavPrefix(path);",
-      "    if(!p) return false;",
-      "    for(var i=0;i<HIDE_NAV_FOLDERS.length;i++){",
-      "      var pref=normalizeNavPrefix(HIDE_NAV_FOLDERS[i]);",
-      "      if(!pref) continue;",
-      "      if(p===pref) return true;",
-      "      if(p.startsWith(pref + '/')) return true;",
-      "    }",
-      "    return false;",
-      "  }",
-      "  function closestNavRoot(){",
-      "    return document.querySelector('.site-body-left-column')",
-      "      || document.querySelector('.nav-view')",
-      "      || document.querySelector('nav');",
-      "  }",
-      "  function applyNavHiding(){",
-      "    if(!HIDE_NAV_FOLDERS || !HIDE_NAV_FOLDERS.length) return;",
-      "    var root=closestNavRoot();",
-      "    if(!root) return;",
-      "",
-      "    var nodes=root.querySelectorAll('[data-path]');",
-      "    for(var i=0;i<nodes.length;i++){",
-      "      var el=nodes[i];",
-      "      var dp=el.getAttribute('data-path');",
-      "      if(!dp) continue;",
-      "      if(shouldHideNavPath(dp)){",
-      "        el.style.display='none';",
-      "      }",
-      "    }",
-      "",
-      "    var links=root.querySelectorAll('a.internal-link[data-href]');",
-      "    for(var j=0;j<links.length;j++){",
-      "      var a=links[j];",
-      "      var href=a.getAttribute('data-href') || '';",
-      "      href=stripWikiBrackets(href);",
-      "      if(shouldHideNavPath(href)){",
-      "        var row=a.closest('li') || a.closest('.tree-item') || a;",
-      "        if(row && row.style) row.style.display='none';",
-      "      }",
-      "    }",
-      "  }",
-      "",
-      "  function normalizeForHash(input){",
-      "    var s=String(input||'').trim();",
-      "    if(s.startsWith('[[') && s.endsWith(']]')) s=s.slice(2,-2).trim();",
-      "    s=s.replace(/\\\\/g,'/');",
-      "    s=s.replace(/^\\.\\/+/, '');",
-      "    s=s.replace(/\\/{2,}/g,'/');",
-      "    s=s.replace(/^\\/+/, '');",
-      "    return s;",
-      "  }",
-      "",
-      "  function fnv1a32(str){",
-      "    var h=0x811c9dc5;",
-      "    for(var i=0;i<str.length;i++){",
-      "      h ^= str.charCodeAt(i);",
-      "      h = Math.imul(h, 0x01000193);",
-      "    }",
-      "    return (h>>>0);",
-      "  }",
-      "",
-      "  function hashPathToId(path){",
-      "    return fnv1a32(normalizeForHash(path)).toString(36);",
-      "  }",
-      "",
-      "  function hashKeyToId(key){",
-      "    var s = String(key||'').trim().toLowerCase();",
-      "    return fnv1a32(s).toString(36);",
-      "  }",
-      "",
-      "  function encodeRoutePath(p){",
-      "    var parts = String(p || '').split('/');",
-      "    for(var i=0;i<parts.length;i++){",
-      "      var seg = parts[i];",
-      "      if(!seg) continue;",
-      "      // If user already put percent escapes in the segment, keep them (avoid double encoding).",
-      "      if(seg.indexOf('%') >= 0){",
-      "        parts[i] = seg.replace(/ /g, '+');",
-      "      } else {",
-      "        // Publish commonly uses '+' for spaces in routes/assets",
-      "        parts[i] = encodeURIComponent(seg).replace(/%20/g, '+');",
-      "      }",
-      "    }",
-      "    return parts.join('/');",
-      "  }",
-      "",
-      "  function resolveUrl(path){",
-      "    if(!path) return '';",
-      "    if(/^data:/.test(path)) return path;",
-      "    if(/^https?:\\/\\//i.test(path)) return path;",
-      "    var p = String(path).trim();",
-      "    p = p.replace(/\\\\/g, '/');",
-      "    p = p.replace(/^\\/+/, '');",
-      "    p = p.replace(/\\/{2,}/g, '/');",
-      "    p = encodeRoutePath(p);",
-      "    try{ return new URL(p, SITE_BASE).toString(); }catch(_e){ return SITE_BASE + p; }",
-      "  }",
-      "  function resolveAssetUrl(vaultPath, useAltEncoding){",
-      "    if(!vaultPath) return '';",
-      "    var p = String(vaultPath).trim();",
-      "    if(/^data:/.test(p)) return p;",
-      "    if(/^https?:\\/\\//i.test(p)) return p;",
-      "    p = p.replace(/\\\\/g, '/');",
-      "    p = p.replace(/^\\/+/, '');",
-      "    p = p.replace(/\\/{2,}/g, '/');",
-      "    var accessBase = getAccessBaseUrl();",
-      "    if(accessBase){",
-      "      // access endpoint usually uses %20 (encodeURI), but we keep an alt (+) encoding just in case",
-      "      var enc = useAltEncoding ? encodeRoutePath(p) : encodeURI(p);",
-      "      return accessBase + enc;",
-      "    }",
-      "    // fallback: site route resolver (may be blocked by CSP for images, but better than nothing)",
-      "    return resolveUrl(p);",
-      "  }",
-      "  function stripWikiBrackets(s){",
-      "    var t = String(s||'').trim();",
-      "    if(t.startsWith('[[') && t.endsWith(']]')) return t.slice(2,-2).trim();",
-      "    return t;",
-      "  }",
-      "",
-      "  function stripMdExt(p){",
-      "    var s = String(p||'');",
-      "    return s.toLowerCase().endsWith('.md') ? s.slice(0, -3) : s;",
-      "  }",
-      "",
-      "  function resolveNoteHref(link){",
-      "    // NOTE ROUTES in Publish use normal URL encoding (%20), not '+' like some assets.",
-      "    var t = stripWikiBrackets(link);",
-      "    var parts = t.split('#');",
-      "    var path = (parts[0] || '').trim();",
-      "    var frag = parts.length > 1 ? parts.slice(1).join('#') : '';",
-      "    path = path.replace(/\\\\/g,'/');",
-      "    path = path.replace(/^\\/+/, '');",
-      "    path = path.replace(/\\/{2,}/g,'/');",
-      "    path = stripMdExt(path);",
-      "    var href = '';",
-      "    try{ href = new URL(encodeURI(path), SITE_BASE).toString(); }catch(_e){ href = SITE_BASE + encodeURI(path); }",
-      "    if(frag){ href += '#' + encodeURIComponent(frag); }",
-      "    return href;",
-      "  }",
-      "",
-      "  function fetchTextCached(url){",
-      "    if(STATE.textCache.has(url)) return STATE.textCache.get(url);",
-      "    var p = fetch(url, { credentials: 'include' }).then(function(r){",
-      "      if(!r.ok) throw new Error('HTTP '+r.status+' '+r.statusText);",
-      "      return r.text();",
-      "    });",
-      "    STATE.textCache.set(url, p);",
-      "    return p;",
-      "  }",
-      "",
-      "  function getAccessBaseUrl(){",
-      "    var si = window.siteInfo || {};",
-      "    var host = (si.host || '').trim();",
-      "    var uid = (si.uid || '').trim();",
-      "    if(!host || !uid) return '';",
-      "    if(!/^https?:\\/\\//i.test(host)) host = 'https://' + host;",
-      "    if(!host.endsWith('/')) host += '/';",
-      "    return host + 'access/' + uid + '/';",
-      "  }",
-      "",
-      "  function notePathToMdPath(notePath){",
-      "    var p = String(notePath||'').trim();",
-      "    if(p.startsWith('[[') && p.endsWith(']]')) p = p.slice(2,-2).trim();",
-      "    // remove fragment/query",
-      "    p = p.split('#')[0].split('?')[0];",
-      "    p = p.replace(/\\\\/g,'/');",
-      "    p = p.replace(/^\\/+/, '');",
-      "    p = p.replace(/\\/{2,}/g,'/');",
-      "    if(!p.toLowerCase().endsWith('.md')) p += '.md';",
-      "    return p;",
-      "  }",
-      "  function stripLineNumbersIfPresent(text){",
-      "    var s = String(text||'');",
-      "    var lines = s.split('\\n');",
-      "    var sample = [];",
-      "    for(var i=0;i<lines.length && sample.length<8;i++){",
-      "      var t = lines[i].trim();",
-      "      if(t) sample.push(lines[i]);",
-      "    }",
-      "    if(sample.length < 3) return s;",
-      "    var hits = 0;",
-      "    for(var j=0;j<sample.length;j++){",
-      "      if(/^\\s*\\d+\\s+/.test(sample[j])) hits++;",
-      "    }",
-      "    if(hits >= Math.ceil(sample.length * 0.6)){",
-      "      for(var k=0;k<lines.length;k++){",
-      "        lines[k] = lines[k].replace(/^\\s*\\d+\\s+/, '');",
-      "      }",
-      "      return lines.join('\\n');",
-      "    }",
-      "    return s;",
-      "  }",
-      "",
-      "  function tryParseJsonFromText(raw){",
-      "    var t = stripLineNumbersIfPresent(raw);",
-      "    var s = String(t||'').trim();",
-      "    if(!s) return null;",
-      "    // fast reject",
-      "    var c0 = s[0];",
-      "    if(c0 !== '{' && c0 !== '[') return null;",
-      "    try{ return JSON.parse(s); }catch(_e){ return null; }",
-      "  }",
-      "  function extractJsonFromMarkdown(md){",
-      "    var text = String(md||'');",
-      "    var blocks = [];",
-      "",
-      "    // Prefer ```json fences",
-      "    var re = /```json\\s*([\\s\\S]*?)```/ig;",
-      "    var m;",
-      "    while((m = re.exec(text))){",
-      "      if(m[1]) blocks.push(m[1]);",
-      "    }",
-      "",
-      "    // Fallback: any fenced block that looks like JSON",
-      "    if(blocks.length === 0){",
-      "      var re2 = /```\\s*([\\s\\S]*?)```/g;",
-      "      while((m = re2.exec(text))){",
-      "        if(m[1]) blocks.push(m[1]);",
-      "      }",
-      "    }",
-      "",
-      "    var bestObj = null; var bestLen = 0;",
-      "    for(var i=0;i<blocks.length;i++){",
-      "      var raw = blocks[i];",
-      "      var obj = tryParseJsonFromText(raw);",
-      "      if(!obj) continue;",
-      "      var len = String(raw||'').length;",
-      "      if(len > bestLen){ bestLen = len; bestObj = obj; }",
-      "    }",
-      "    if(bestObj) return bestObj;",
-      "    throw new Error('No JSON payload found in markdown (no parseable fenced JSON block).');",
-      "  }",
-      "",
-      "  function extractJsonFromNoteHtml(html){",
-      "    var doc = new DOMParser().parseFromString(String(html||''), 'text/html');",
-      "",
-      "    // Collect candidates in priority order",
-      "    var candidates = [];",
-      "",
-      "    // 1) Any <pre> blocks (Publish often renders fenced code blocks into <pre>)",
-      "    var pres = doc.querySelectorAll('pre');",
-      "    for(var i=0;i<pres.length;i++){",
-      "      var txt = pres[i].textContent || '';",
-      "      if(txt) candidates.push(txt);",
-      "    }",
-      "",
-      "    // 2) Fallback: any <code> blocks (some themes wrap differently)",
-      "    var codes = doc.querySelectorAll('code');",
-      "    for(var j=0;j<codes.length;j++){",
-      "      var txt2 = codes[j].textContent || '';",
-      "      if(txt2) candidates.push(txt2);",
-      "    }",
-      "",
-      "    // 3) Last resort: look for fenced ```json ... ``` inside the raw HTML (in case Publish embeds raw markdown somewhere)",
-      "    if(candidates.length === 0){",
-      "      var m = /```json\\s*([\\s\\S]*?)```/i.exec(String(html||''));",
-      "      if(m && m[1]) candidates.push(m[1]);",
-      "    }",
-      "",
-      "    var bestObj = null;",
-      "    var bestLen = 0;",
-      "    for(var k=0;k<candidates.length;k++){",
-      "      var raw = candidates[k];",
-      "      var obj = tryParseJsonFromText(raw);",
-      "      if(!obj) continue;",
-      "      var len = String(raw||'').length;",
-      "      if(len > bestLen){ bestLen = len; bestObj = obj; }",
-      "    }",
-      "",
-      "    if(bestObj) return bestObj;",
-      "",
-      "    // Debug hint (helps users diagnose Publish rendering differences)",
-      "    throw new Error('No JSON payload found in note HTML (no parseable <pre>/<code> JSON).');",
-      "  }",
-      "",
-      "  function fetchNoteJson(notePath){",
-      "    var mdPath = notePathToMdPath(notePath);",
-      "    var accessBase = getAccessBaseUrl();",
-      "    if(accessBase){",
-      "      // IMPORTANT: access endpoint expects URL-encoded path but keeps slashes",
-      "      var accessUrl = accessBase + encodeURI(mdPath);",
-      "      if(STATE.noteJsonCache.has(accessUrl)) return STATE.noteJsonCache.get(accessUrl);",
-      "      var p = fetchTextCached(accessUrl).then(function(md){",
-      "        return extractJsonFromMarkdown(md);",
-      "      });",
-      "      STATE.noteJsonCache.set(accessUrl, p);",
-      "      return p;",
-      "    }",
-      "",
-      "    // Fallback: try to fetch the note HTML route (may not contain content on Publish SPA)",
-      "    var url = resolveUrl(String(notePath||'').trim());",
-      "    if(STATE.noteJsonCache.has(url)) return STATE.noteJsonCache.get(url);",
-      "    var p2 = fetchTextCached(url).then(function(html){ return extractJsonFromNoteHtml(html); });",
-      "    STATE.noteJsonCache.set(url, p2);",
-      "    return p2;",
-      "  }",
-      "",
-      "  function ensureLibrary(){",
-      "    if(STATE.libraryPromise) return STATE.libraryPromise;",
-      "    STATE.libraryPromise = fetchNoteJson(LIB_NOTE).then(function(obj){",
-      "      STATE.library = obj || { icons: [], baseCollections: [] };",
-      "      return STATE.library;",
-      "    }).catch(function(err){",
-      "      console.warn('ZoomMap Publish: library note load failed', err);",
-      "      STATE.library = { icons: [], baseCollections: [] };",
-      "      return STATE.library;",
-      "    });",
-      "    return STATE.libraryPromise;",
-      "  }",
-      "",
-      "  function parseZoomFactor(v, fallback){",
-      "    if(typeof v==='number' && isFinite(v) && v>0) return v;",
-      "    if(typeof v==='string'){",
-      "      var s=v.trim();",
-      "      if(!s) return fallback;",
-      "      var pct=false;",
-      "      if(s.endsWith('%')){pct=true; s=s.slice(0,-1).trim();}",
-      "      s=s.replace(',', '.');",
-      "      var n=Number(s);",
-      "      if(isFinite(n) && n>0) return pct ? (n/100) : n;",
-      "    }",
-      "    return fallback;",
-      "  }",
-      "",
-      "  // YAML subset parser (same as before, plus markersPath kept as original string)",
-      "  function parseZoommapYaml(raw){",
-      "    var lines = String(raw||'').split('\\n').map(function(ln){return stripQuotePrefix(ln);});",
-      "    while(lines.length && !lines[0].trim()) lines.shift();",
-      "    while(lines.length && !lines[lines.length-1].trim()) lines.pop();",
-      "",
-      "    var scalars = {};",
-      "    var blocks = {};",
-      "    var i=0;",
-      "    function isTopKey(ln){",
-      "      if(!ln) return false;",
-      "      if(/^\\s+#/.test(ln)) return false;",
-      "      return /^([A-Za-z0-9_-]+)\\s*:\\s*(.*)$/.test(ln) && (/^\\S/.test(ln));",
-      "    }",
-      "    while(i<lines.length){",
-      "      var ln=lines[i];",
-      "      if(!ln.trim() || ln.trim().startsWith('#')){ i++; continue; }",
-      "      var m=/^([A-Za-z0-9_-]+)\\s*:\\s*(.*)$/.exec(ln);",
-      "      if(!m){ i++; continue; }",
-      "      var key=m[1];",
-      "      var rest=(m[2]||'').trim();",
-      "      i++;",
-      "      if(rest){ scalars[key]=rest; continue; }",
-      "      var block=[];",
-      "      while(i<lines.length){",
-      "        var nx=lines[i];",
-      "        if(isTopKey(nx)) break;",
-      "        block.push(nx);",
-      "        i++;",
-      "      }",
-      "      blocks[key]=block;",
-      "    }",
-      "",
-      "    function parseBool(s){",
-      "      var t=(s||'').trim().toLowerCase();",
-      "      if(t==='true') return true;",
-      "      if(t==='false') return false;",
-      "      return undefined;",
-      "    }",
-      "",
-      "    function parseListBlock(block){",
-      "      var out=[];",
-      "      var j=0;",
-      "      while(j<block.length){",
-      "        var ln=block[j];",
-      "        if(!ln.trim() || ln.trim().startsWith('#')){ j++; continue; }",
-      "        var t=ln.trim();",
-      "        if(!t.startsWith('-')){ j++; continue; }",
-      "        var after=t.slice(1).trim();",
-      "        if(!after){ j++; continue; }",
-      "        var mm=/^path\\s*:\\s*(.+)$/.exec(after);",
-      "        if(mm){",
-      "          var obj={ path: stripQuotes(mm[1]||'') };",
-      "          j++;",
-      "          while(j<block.length){",
-      "            var ln2=block[j];",
-      "            if(!ln2.trim() || ln2.trim().startsWith('#')){ j++; continue; }",
-      "            if(ln2.trim().startsWith('-')) break;",
-      "            var mm2=/^\\s*([A-Za-z0-9_-]+)\\s*:\\s*(.*)$/.exec(ln2);",
-      "            if(mm2){",
-      "              var k2=mm2[1];",
-      "              var v2=(mm2[2]||'').trim();",
-      "              if(k2==='name') obj.name=stripQuotes(v2);",
-      "              if(k2==='visible'){",
-      "                var b=parseBool(v2);",
-      "                if(typeof b==='boolean') obj.visible=b;",
-      "              }",
-      "            }",
-      "            j++;",
-      "          }",
-      "          out.push(obj);",
-      "          continue;",
-      "        }",
-      "        out.push(stripQuotes(after));",
-      "        j++;",
-      "      }",
-      "      return out;",
-      "    }",
-      "",
-      "    var image = stripQuotes(scalars.image || '');",
-      "    var markers = stripQuotes(scalars.markers || '');",
-      "    var render = stripQuotes(scalars.render || '');",
-      "    var width = stripQuotes(scalars.width || '');",
-      "    var height = stripQuotes(scalars.height || '');",
-      "    var responsive = parseBool(scalars.responsive);",
-      "    var widthFromYaml = Object.prototype.hasOwnProperty.call(scalars, 'width');",
-      "    var heightFromYaml = Object.prototype.hasOwnProperty.call(scalars, 'height');",
-      "",
-      "    var imageBases = blocks.imageBases ? parseListBlock(blocks.imageBases) : [];",
-      "    var imageOverlays = blocks.imageOverlays ? parseListBlock(blocks.imageOverlays) : [];",
-      "    if(!image && imageBases.length){",
-      "      var first=imageBases[0];",
-      "      if(typeof first==='string') image=first;",
-      "      else if(first && typeof first==='object' && typeof first.path==='string') image=first.path;",
-      "    }",
-      "    if(!markers && image) markers = image + '.markers.json';",
-      "",
-      "    var minZoom = parseZoomFactor(scalars.minZoom, 0.25);",
-      "    var maxZoom = parseZoomFactor(scalars.maxZoom, 8);",
-      "",
-      "    var rm = (render||'').toLowerCase();",
-      "    var renderMode = (rm==='canvas' ? 'canvas' : 'dom');",
-      "",
-      "    var viewportFrame = stripQuotes(scalars.viewportFrame || '');",
-      "    var viewportFrameInsets = null;",
-      "    if(blocks.viewportFrameInsets){",
-      "      // Very small YAML subset: unit + 4 numbers",
-      "      var unit='framePx', top=0,right=0,bottom=0,left=0;",
-      "      for(var k=0;k<blocks.viewportFrameInsets.length;k++){",
-      "        var ln=blocks.viewportFrameInsets[k];",
-      "        if(!ln || !ln.trim() || ln.trim().startsWith('#')) continue;",
-      "        var mm=/^\\s*([A-Za-z0-9_-]+)\\s*:\\s*(.*)$/.exec(ln);",
-      "        if(!mm) continue;",
-      "        var kk=mm[1]; var vv=(mm[2]||'').trim();",
-      "        if(kk==='unit'){ var u=stripQuotes(vv); if(u==='percent') unit='percent'; else unit='framePx'; }",
-      "        if(kk==='top') top=Number(stripQuotes(vv).replace(',','.'))||0;",
-      "        if(kk==='right') right=Number(stripQuotes(vv).replace(',','.'))||0;",
-      "        if(kk==='bottom') bottom=Number(stripQuotes(vv).replace(',','.'))||0;",
-      "        if(kk==='left') left=Number(stripQuotes(vv).replace(',','.'))||0;",
-      "      }",
-      "      viewportFrameInsets = { unit: unit, top: top, right: right, bottom: bottom, left: left };",
-      "    }",
-      "",
-      "    var initialZoom = null;",
-      "    var initialCenter = null;",
-      "    if(blocks.view){",
-      "      var vz = NaN, vcx = NaN, vcy = NaN;",
-      "      for(var vi=0;vi<blocks.view.length;vi++){",
-      "        var vln = blocks.view[vi];",
-      "        if(!vln || !vln.trim() || vln.trim().startsWith('#')) continue;",
-      "        var vm = /^\\s*([A-Za-z0-9_-]+)\\s*:\\s*(.*)$/.exec(vln);",
-      "        if(!vm) continue;",
-      "        var vk = vm[1];",
-      "        var vv = (vm[2]||'').trim();",
-      "        if(vk==='zoom') vz = parseZoomFactor(stripQuotes(vv), NaN);",
-      "        if(vk==='centerX') vcx = Number(stripQuotes(vv).replace(',', '.'));",
-      "        if(vk==='centerY') vcy = Number(stripQuotes(vv).replace(',', '.'));",
-      "      }",
-      "      if(isFinite(vz) && vz>0) initialZoom = vz;",
-      "      if(isFinite(vcx) && isFinite(vcy)) initialCenter = { x: clamp(vcx,0,1), y: clamp(vcy,0,1) };",
-      "    }",
-      "",
-      "    return {",
-      "      imagePath: image,",
-      "      markersPath: markers,",
-      "      markersNote: (MARKERS_PREFIX + hashPathToId(markers)),",
-      "      minZoom: minZoom,",
-      "      maxZoom: maxZoom,",
-      "      width: width || '100%',",
-      "      height: height || '480px',",
-      "      renderMode: renderMode,",
-      "      responsive: !!responsive,",
-      "      widthFromYaml: !!widthFromYaml,",
-      "      heightFromYaml: !!heightFromYaml,",
-      "      imageBases: imageBases,",
-      "      imageOverlays: imageOverlays,",
-      "      initialZoom: initialZoom,",
-      "      initialCenter: initialCenter,",
-      "      viewportFrame: viewportFrame,",
-      "      viewportFrameInsets: viewportFrameInsets",
-      "    };",
-      "  }",
-      "",
-      "  // ===== Minimal Publish map implementation (read-only) =====",
-      "  function PublishMap(host, cfg, data, library){",
-      "    this.host=host; this.cfg=cfg; this.data=data||{}; this.library=library||{};",
-      "    this.isMobile=false; this.responsiveEffective=false;",
-      "    this.canvasImgCache = Object.create(null);",
-      "    this.imgW=0; this.imgH=0; this.vw=0; this.vh=0;",
-      "    this.scale=1; this.tx=0; this.ty=0;",
-      "    this.dragging=false; this.lastX=0; this.lastY=0;",
-      "    this.measuring=false; this.measurePts=[]; this.measurePreview=null;",
-      "    this.menu=null; this.tooltip=null; this.tooltipTimer=0;",
-      "    this.toastEl=null; this.toastTimer=0;",
-      "    this.textRasterFailed=false;",
-      "    this.baseImg=null; this.baseCanvas=null; this.baseCtx=null;",
-      "    this.frameLayerEl=null; this.frameImgEl=null; this.frameNaturalW=0; this.frameNaturalH=0;",
-      "	 this.hudLayerEl=null;",
-      "    this.drawEl=null; this.drawHitboxesEl=null; this.drawSvg=null; this.drawDefs=null; this.drawLayer=null;",
-      "    this.textEl=null; this.textSvg=null; this.textLayer=null;",
-      "    this.hudMarkersEl=null;",
-      "    this.ro=null;",
-      "  }",
-      "  PublishMap.prototype.applyHostSize=function(){",
-      "    // Always use responsive layout: width 100%, but cap the max width to the configured map width.",
-      "    this.host.style.width = '100%';",
-      "    this.host.style.aspectRatio = '';",
-      "",
-      "    var w = (this.cfg.width || '100%');",
-      "    var h = (this.cfg.height || '480px');",
-      "    var fr = (this.data && this.data.frame) ? this.data.frame : null;",
-      "    if(fr && isNum(fr.w) && fr.w>=48 && !this.cfg.widthFromYaml){",
-      "      w = Math.max(220, Math.round(fr.w)) + 'px';",
-      "    }",
-      "    if(fr && isNum(fr.h) && fr.h>=48 && !this.cfg.heightFromYaml){",
-      "      h = Math.max(220, Math.round(fr.h)) + 'px';",
-      "    }",
-      "",
-      "    // maxWidth only makes sense for absolute sizes; ignore percent-based widths.",
-      "    var wTrim = String(w||'').trim();",
-      "    if(wTrim && wTrim.indexOf('%') < 0){",
-      "      this.host.style.maxWidth = wTrim;",
-      "    }else{",
-      "      this.host.style.maxWidth = '';",
-      "    }",
-      "",
-      "    if(this.responsiveEffective){",
-      "      // Try to avoid initial 0-height (absolute children). Use stored image size if available.",
-      "      var sw=0, sh=0;",
-      "      if(this.data && this.data.size && isNum(this.data.size.w) && isNum(this.data.size.h)){",
-      "        sw=this.data.size.w; sh=this.data.size.h;",
-      "      }",
-      "      if(sw>0 && sh>0){",
-      "        this.host.style.height = 'auto';",
-      "        this.host.style.aspectRatio = sw + ' / ' + sh;",
-      "      }else{",
-      "        this.host.style.height = h;",
-      "        this.host.style.aspectRatio = '';",
-      "      }",
-      "      return;",
-      "    }",
-      "",
-      "    this.host.style.height = h;",
-      "  };",
-      "",
-      "  PublishMap.prototype.applyInitialView=function(zoom, center){",
-      "    var r=this.viewportEl.getBoundingClientRect();",
-      "    this.vw=r.width||1; this.vh=r.height||1;",
-      "    if(!(this.imgW>0 && this.imgH>0 && this.vw>1 && this.vh>1)){ this.fitToView(); return; }",
-      "    var z=clamp(zoom, this.cfg.minZoom, this.cfg.maxZoom);",
-      "    var cx=clamp(center && center.x!=null ? center.x : 0.5, 0, 1) * this.imgW;",
-      "    var cy=clamp(center && center.y!=null ? center.y : 0.5, 0, 1) * this.imgH;",
-      "    this.scale=z;",
-      "    this.tx=(this.vw/2) - cx*z;",
-      "    this.ty=(this.vh/2) - cy*z;",
-      "    this.applyTransform();",
-      "  };",
-      "  PublishMap.prototype.updateResponsiveAspectRatio=function(){",
-      "    if(!this.responsiveEffective) return;",
-      "    if(!(this.imgW>0 && this.imgH>0)) return;",
-      "    this.host.style.width = '100%';",
-      "    this.host.style.height = 'auto';",
-      "    this.host.style.aspectRatio = this.imgW + ' / ' + this.imgH;",
-      "  };",
-      "",
-      "  PublishMap.prototype.init=function(){",
-      "    var self=this;",
-      "    self.host.classList.add('zm-root');",
-      "    self.isMobile = isLikelyMobile();",
-      "    self.responsiveEffective = !!self.cfg.responsive;",
-      "    self.applyHostSize();",
-      "",
-      "    self.viewportEl=document.createElement('div');",
-      "    self.viewportEl.className='zm-viewport';",
-      "    self.host.innerHTML='';",
-      "    self.host.appendChild(self.viewportEl);",
-      "",
-      "    // Viewport frame (optional)",
-      "    if(self.cfg.viewportFrame){",
-      "      self.host.classList.add('zm-root--framepad');",
-      "      self.frameLayerEl=document.createElement('div');",
-      "      self.frameLayerEl.className='zm-frame-layer';",
-      "      self.frameImgEl=document.createElement('img');",
-      "      self.frameImgEl.className='zm-viewport-frame';",
-      "      self.frameImgEl.decoding='async';",
-      "      self.frameImgEl.src=resolveAssetUrl(self.cfg.viewportFrame, false);",
-      "      self.frameLayerEl.appendChild(self.frameImgEl);",
-      "      self.host.appendChild(self.frameLayerEl);",
-      "    }",
-      "",
-      "    self.hudLayerEl=document.createElement('div');",
-      "    self.hudLayerEl.className='zm-hud-layer';",
-      "    self.host.appendChild(self.hudLayerEl);",
-      "",
-      "    if(self.cfg.renderMode==='canvas'){",
-      "      self.baseCanvas=document.createElement('canvas');",
-      "      self.baseCanvas.className='zm-canvas';",
-      "      self.viewportEl.appendChild(self.baseCanvas);",
-      "      self.baseCtx=self.baseCanvas.getContext('2d');",
-      "    }",
-      "",
-      "    self.worldEl=document.createElement('div');",
-      "    self.worldEl.className='zm-world';",
-      "    self.viewportEl.appendChild(self.worldEl);",
-      "",
-      "    self.imgEl=document.createElement('img');",
-      "    self.imgEl.className='zm-image';",
-      "    self.worldEl.appendChild(self.imgEl);",
-      "",
-      "    self.overlaysEl=document.createElement('div');",
-      "    self.overlaysEl.className='zm-overlays';",
-      "    self.worldEl.appendChild(self.overlaysEl);",
-      "",
-      "    self.markersEl=document.createElement('div');",
-      "    self.markersEl.className='zm-markers';",
-      "    self.worldEl.appendChild(self.markersEl);",
-      "",
-      "    self.hudMarkersEl=document.createElement('div');",
-      "    self.hudMarkersEl.className='zm-hud-markers';",
-      "    self.hudLayerEl.appendChild(self.hudMarkersEl);",
-      "",
-      "    self.measureEl=document.createElement('div');",
-      "    self.measureEl.className='zm-measure';",
-      "    self.worldEl.appendChild(self.measureEl);",
-      "",
-      "    self.measureSvg=document.createElementNS('http://www.w3.org/2000/svg','svg');",
-      "    self.measureSvg.classList.add('zm-measure__svg');",
-      "    self.measureEl.appendChild(self.measureSvg);",
-      "    self.measurePath=document.createElementNS('http://www.w3.org/2000/svg','path');",
-      "    self.measurePath.classList.add('zm-measure__path');",
-      "    self.measureSvg.appendChild(self.measurePath);",
-      "    self.measureDots=document.createElementNS('http://www.w3.org/2000/svg','g');",
-      "    self.measureSvg.appendChild(self.measureDots);",
-      "",
-      "    self.measureHud=document.createElement('div');",
-      "    self.measureHud.className='zm-measure-hud';",
-      "    self.hudLayerEl.appendChild(self.measureHud);",
-      "",
-      "    self.toastEl=document.createElement('div');",
-      "    self.toastEl.className='zm-toast';",
-      "    self.hudLayerEl.appendChild(self.toastEl);",
-      "",
-      "    // Drawings layer",
-      "    self.drawEl=document.createElement('div');",
-      "    self.drawEl.className='zm-draw';",
-      "    self.worldEl.appendChild(self.drawEl);",
-      "    self.drawHitboxesEl=document.createElement('div');",
-      "    self.drawHitboxesEl.className='zm-draw-hitboxes';",
-      "    self.worldEl.appendChild(self.drawHitboxesEl);",
-      "    self.drawSvg=document.createElementNS('http://www.w3.org/2000/svg','svg');",
-      "    self.drawSvg.classList.add('zm-draw__svg');",
-      "    self.drawEl.appendChild(self.drawSvg);",
-      "    self.drawDefs=document.createElementNS('http://www.w3.org/2000/svg','defs');",
-      "    self.drawSvg.appendChild(self.drawDefs);",
-      "    self.drawLayer=document.createElementNS('http://www.w3.org/2000/svg','g');",
-      "    self.drawSvg.appendChild(self.drawLayer);",
-      "",
-      "    // Text layer (static render)",
-      "    self.textEl=document.createElement('div');",
-      "    self.textEl.className='zm-text';",
-      "    self.worldEl.appendChild(self.textEl);",
-      "    self.textSvg=document.createElementNS('http://www.w3.org/2000/svg','svg');",
-      "    self.textSvg.classList.add('zm-text__svg');",
-      "    self.textEl.appendChild(self.textSvg);",
-      "    self.textLayer=document.createElementNS('http://www.w3.org/2000/svg','g');",
-      "    self.textSvg.appendChild(self.textLayer);",
-      "",
-      "    // events",
-      "    self.viewportEl.addEventListener('wheel', function(e){",
-      "      if(self.responsiveEffective) return;",
-      "      e.preventDefault();",
-      "      self.onWheel(e);",
-      "    }, { passive:false });",
-      "",
-      "    self.viewportEl.addEventListener('dblclick', function(e){",
-      "      if(self.responsiveEffective) return;",
-      "      e.preventDefault();",
-      "      self.zoomAt(e.clientX, e.clientY, 1.5);",
-      "    });",
-      "",
-      "    self.viewportEl.addEventListener('pointerdown', function(e){",
-      "      if(e.button!==0) return;",
-      "      var tgt = e.target;",
-      "      if(tgt && tgt.closest && tgt.closest('.zm-marker')) return;",
-      "      if(tgt && tgt.closest && (tgt.closest('.zm-menu') || tgt.closest('.zm-submenu'))) return;",
-      "      if(self.measuring){ self.addMeasurePointFromEvent(e); return; }",
-      "      if(self.responsiveEffective) return;",
-      "      self.dragging=true; self.lastX=e.clientX; self.lastY=e.clientY;",
-      "      self.viewportEl.setPointerCapture(e.pointerId);",
-      "    });",
-      "",
-      "    self.viewportEl.addEventListener('pointermove', function(e){",
-      "      if(self.measuring) self.updateMeasurePreviewFromEvent(e);",
-      "      if(self.responsiveEffective) return;",
-      "      if(!self.dragging) return;",
-      "      var dx=e.clientX-self.lastX, dy=e.clientY-self.lastY;",
-      "      self.lastX=e.clientX; self.lastY=e.clientY;",
-      "      self.panBy(dx,dy);",
-      "    });",
-      "",
-      "    self.viewportEl.addEventListener('pointerup', function(_e){ self.dragging=false; });",
-      "    self.host.addEventListener('contextmenu', function(e){ e.preventDefault(); self.openContextMenu(e.clientX,e.clientY); });",
-      "",
-      "    document.addEventListener('pointerdown', function(ev){",
-      "      if(!self.menu) return;",
-      "      var t=ev.target;",
-      "      if(t && self.menu.contains(t)) return;",
-      "      self.closeMenu();",
-      "    }, true);",
-      "",
-      "    if('ResizeObserver' in window){",
-      "      self.ro = new ResizeObserver(function(){ self.onResize(); });",
-      "      self.ro.observe(self.host);",
-      "    }",
-      "",
-      "    return self.ensureFrameNaturalSize().then(function(){",
-      "      self.applyViewportInset();",
-      "      return self.loadBase(self.getActiveBasePath());",
-      "    }).then(function(){",
-      "      self.applyBoundBaseVisibility();",
-      "      self.applySizes();",
-      "      if(self.responsiveEffective){",
-      "        self.fitToView();",
-      "      }else if(self.cfg.initialZoom && self.cfg.initialCenter){",
-      "        self.applyInitialView(self.cfg.initialZoom, self.cfg.initialCenter);",
-      "      }else self.fitToView();",
-      "      self.updateHudPinsForResize(self.viewportEl.getBoundingClientRect());",
-      "      self.renderOverlays();",
-      "      self.renderMarkers();",
-      "      self.renderDrawings();",
-      "      self.renderTextLayers();",
-      "      self.renderCanvas();",
-      "      self.renderMeasure();",
-      "    });",
-      "  };",
-      "  PublishMap.prototype.getBasesNormalized=function(){",
-      "    var out=[];",
-      "    var raw = (this.data && Array.isArray(this.data.bases)) ? this.data.bases : null;",
-      "    var yaml = Array.isArray(this.cfg.imageBases) ? this.cfg.imageBases : [];",
-      "    if(raw && raw.length){",
-      "      for(var i=0;i<raw.length;i++){",
-      "        var it=raw[i];",
-      "        if(typeof it==='string'){ out.push({ path: it, name: '' }); }",
-      "        else if(it && typeof it==='object' && typeof it.path==='string'){ out.push({ path: it.path, name: it.name||'' }); }",
-      "      }",
-      "    } else if(yaml && yaml.length){",
-      "      for(var j=0;j<yaml.length;j++){",
-      "        var y=yaml[j];",
-      "        if(typeof y==='string') out.push({ path: y, name: '' });",
-      "        else if(y && typeof y==='object' && typeof y.path==='string') out.push({ path: y.path, name: y.name||'' });",
-      "      }",
-      "    } else if(this.cfg.imagePath){",
-      "      out.push({ path: this.cfg.imagePath, name: '' });",
-      "    }",
-      "    // de-dup by path",
-      "    var seen={};",
-      "    var uniq=[];",
-      "    for(var k=0;k<out.length;k++){",
-      "      var p=String(out[k].path||'').trim();",
-      "      if(!p || seen[p]) continue;",
-      "      seen[p]=true;",
-      "      uniq.push(out[k]);",
-      "    }",
-      "    return uniq;",
-      "  };",
-      "  PublishMap.prototype.getActiveBasePath=function(){",
-      "    var bases=this.getBasesNormalized();",
-      "    var active=(this.data && typeof this.data.activeBase==='string' && this.data.activeBase.trim()) ? this.data.activeBase.trim() : '';",
-      "    if(active){",
-      "      for(var i=0;i<bases.length;i++){ if(bases[i].path===active) return active; }",
-      "    }",
-      "    return (bases[0] && bases[0].path) ? bases[0].path : (this.cfg.imagePath||'');",
-      "  };",
-      "  PublishMap.prototype.getOverlaysNormalized=function(){",
-      "    var out=[];",
-      "    var raw = (this.data && Array.isArray(this.data.overlays)) ? this.data.overlays : null;",
-      "    var yaml = Array.isArray(this.cfg.imageOverlays) ? this.cfg.imageOverlays : [];",
-      "    var src = (raw && raw.length) ? raw : yaml;",
-      "    for(var i=0;i<src.length;i++){",
-      "      var it=src[i];",
-      "      if(typeof it==='string'){ out.push({ path: it, name:'', visible:false }); }",
-      "      else if(it && typeof it==='object' && typeof it.path==='string'){",
-      "        out.push({ path: it.path, name: it.name||'', visible: (it.visible===true) });",
-      "      }",
-      "    }",
-      "    return out;",
-      "  };",
-      "",
-      "  PublishMap.prototype.applyBoundBaseVisibility=function(){",
-      "    if(!this.data) return;",
-      "    var active = this.getActiveBasePath();",
-      "    var layers = Array.isArray(this.data.layers) ? this.data.layers : [];",
-      "    for(var i=0;i<layers.length;i++){",
-      "      var l=layers[i];",
-      "      if(!l || typeof l.boundBase!=='string' || !String(l.boundBase).trim()) continue;",
-      "      l.visible = (String(l.boundBase).trim() === String(active||'').trim());",
-      "    }",
-      "    var drawLayers = Array.isArray(this.data.drawLayers) ? this.data.drawLayers : [];",
-      "    for(var j=0;j<drawLayers.length;j++){",
-      "      var dl=drawLayers[j];",
-      "      if(!dl || typeof dl.boundBase!=='string' || !String(dl.boundBase).trim()) continue;",
-      "      dl.visible = (String(dl.boundBase).trim() === String(active||'').trim());",
-      "    }",
-      "  };",
-      "  PublishMap.prototype.getTextLayerRasterOverlayPath=function(){",
-      "    var m = this.data && this.data.publishTextLayerOverlays ? this.data.publishTextLayerOverlays : null;",
-      "    if(!m || typeof m !== 'object') return '';",
-      "    var base = this.getActiveBasePath();",
-      "    var p = m[base];",
-      "    return (typeof p === 'string' && p.trim()) ? p.trim() : '';",
-      "  };",
-      "  PublishMap.prototype.ensureCanvasImage=function(url){",
-      "    if(!url) return null;",
-      "    var cache=this.canvasImgCache;",
-      "    var cur=cache[url];",
-      "    if(cur && cur.complete) return cur;",
-      "    if(cur) return cur;",
-      "    var img=new Image();",
-      "    img.decoding='async';",
-      "    img.src=url;",
-      "    cache[url]=img;",
-      "    var self=this;",
-      "    img.onload=function(){ try{ self.renderCanvas(); }catch(_e){} };",
-      "    img.onerror=function(){ cache[url]=null; };",
-      "    return img;",
-      "  };",
-      "  PublishMap.prototype.ensureFrameNaturalSize=function(){",
-      "    var self=this;",
-      "    if(!self.frameImgEl || !self.cfg.viewportFrame) return Promise.resolve();",
-      "    return new Promise(function(resolve){",
-      "      var img=self.frameImgEl;",
-      "      if(img.complete && img.naturalWidth>0){ self.frameNaturalW=img.naturalWidth; self.frameNaturalH=img.naturalHeight; resolve(); return; }",
-      "      img.onload=function(){ self.frameNaturalW=img.naturalWidth||0; self.frameNaturalH=img.naturalHeight||0; resolve(); };",
-      "      img.onerror=function(){ resolve(); };",
-      "    });",
-      "  };",
-      "  PublishMap.prototype.computeViewportInsetsPx=function(outerW, outerH){",
-      "    var spec=this.cfg.viewportFrameInsets;",
-      "    if(!this.cfg.viewportFrame || !spec) return { t:0,r:0,b:0,l:0 };",
-      "    var unit = spec.unit==='percent' ? 'percent' : 'framePx';",
-      "    var t=0,r=0,b=0,l=0;",
-      "    if(unit==='percent'){",
-      "      t = outerH * (Number(spec.top)||0) / 100;",
-      "      b = outerH * (Number(spec.bottom)||0) / 100;",
-      "      l = outerW * (Number(spec.left)||0) / 100;",
-      "      r = outerW * (Number(spec.right)||0) / 100;",
-      "    }else{",
-      "      var fw=this.frameNaturalW||0, fh=this.frameNaturalH||0;",
-      "      if(fw>0 && fh>0){",
-      "        var sx=outerW/fw, sy=outerH/fh;",
-      "        t = (Number(spec.top)||0) * sy;",
-      "        b = (Number(spec.bottom)||0) * sy;",
-      "        l = (Number(spec.left)||0) * sx;",
-      "        r = (Number(spec.right)||0) * sx;",
-      "      }",
-      "    }",
-      "    // clamp to keep minimum inner viewport",
-      "    var minInnerW=64, minInnerH=64;",
-      "    var sumX=l+r; var maxSumX=Math.max(0, outerW-minInnerW);",
-      "    if(sumX>maxSumX && sumX>0){ var kx=maxSumX/sumX; l*=kx; r*=kx; }",
-      "    var sumY=t+b; var maxSumY=Math.max(0, outerH-minInnerH);",
-      "    if(sumY>maxSumY && sumY>0){ var ky=maxSumY/sumY; t*=ky; b*=ky; }",
-      "    return {",
-      "      t: Math.max(0, Math.round(t)),",
-      "      r: Math.max(0, Math.round(r)),",
-      "      b: Math.max(0, Math.round(b)),",
-      "      l: Math.max(0, Math.round(l))",
-      "    };",
-      "  };",
-      "  PublishMap.prototype.applyViewportInset=function(){",
-      "    if(!this.cfg.viewportFrame || !this.viewportEl) return;",
-      "    var rect=this.host.getBoundingClientRect();",
-      "    var w=rect.width||1, h=rect.height||1;",
-      "    var ins=this.computeViewportInsetsPx(w,h);",
-      "    this.viewportEl.style.inset = ins.t+'px '+ins.r+'px '+ins.b+'px '+ins.l+'px';",
-      "	 if(this.hudLayerEl){",
-      "	   this.hudLayerEl.style.inset = ins.t+'px '+ins.r+'px '+ins.b+'px '+ins.l+'px';",
-      "	  }",
-      "  };",
-      "",
-      "  PublishMap.prototype.loadBase=function(path){",
-      "    var self=this;",
-      "    var url=resolveAssetUrl(path, false);",
-      "    var urlAlt=resolveAssetUrl(path, true);",
-      "    var triedAlt=false;",
-      "    console.log('ZoomMap Publish: Base URL:', url, 'alt:', urlAlt, 'from path:', path, 'SITE_BASE:', (typeof SITE_BASE !== 'undefined' ? SITE_BASE : ''), 'accessBase:', getAccessBaseUrl());",
-      "    return new Promise(function(resolve,reject){",
-      "      var img=new Image();",
-      "      img.decoding='async';",
-      "      img.onload=function(){",
-      "        self.imgW=img.naturalWidth||img.width||0;",
-      "        self.imgH=img.naturalHeight||img.height||0;",
-      "        self.baseImg=img;",
-      "        self.imgEl.src=url;",
-      "        if(self.responsiveEffective){",
-      "          self.updateResponsiveAspectRatio();",
-      "          if(self.cfg.viewportFrame) self.applyViewportInset();",
-      "        }",
-      "        resolve();",
-      "      };",
-      "      img.onerror=function(ev){",
-      "        console.warn('ZoomMap Publish: base image failed to load', { path: path, url: url, alt: urlAlt, event: ev });",
-      "        if(!triedAlt && urlAlt && urlAlt !== url){",
-      "          triedAlt = true;",
-      "          url = urlAlt;",
-      "          console.warn('ZoomMap Publish: retry base image with alt url', urlAlt);",
-      "          img.src = urlAlt;",
-      "          self.imgEl.src = urlAlt;",
-      "          return;",
-      "        }",
-      "        reject(new Error('Failed to load base image: '+path+' ('+url+')'));",
-      "      };",
-      "      img.src=url;",
-      "    });",
-      "  };",
-      "  PublishMap.prototype.setActiveBase=function(path){",
-      "    var self=this;",
-      "    if(!path) return Promise.resolve();",
-      "    if(!self.data) self.data={};",
-      "    self.data.activeBase = path;",
-      "    return self.loadBase(path).then(function(){",
-      "      self.applyBoundBaseVisibility();",
-      "      self.applySizes();",
-      "      self.fitToView();",
-      "      self.renderOverlays();",
-      "      self.renderMarkers();",
-      "      self.renderDrawings();",
-      "      self.renderTextLayers();",
-      "      self.renderCanvas();",
-      "      self.renderMeasure();",
-      "    });",
-      "  };",
-      "",
-      "  PublishMap.prototype.applySizes=function(){",
-      "    this.worldEl.style.width=this.imgW+'px';",
-      "    this.worldEl.style.height=this.imgH+'px';",
-      "    this.markersEl.style.width=this.imgW+'px';",
-      "    this.markersEl.style.height=this.imgH+'px';",
-      "    this.overlaysEl.style.width=this.imgW+'px';",
-      "    this.overlaysEl.style.height=this.imgH+'px';",
-      "    this.measureEl.style.width=this.imgW+'px';",
-      "    this.measureEl.style.height=this.imgH+'px';",
-      "    if(this.drawEl){ this.drawEl.style.width=this.imgW+'px'; this.drawEl.style.height=this.imgH+'px'; }",
-      "    if(this.drawHitboxesEl){ this.drawHitboxesEl.style.width=this.imgW+'px'; this.drawHitboxesEl.style.height=this.imgH+'px'; }",
-      "    if(this.textEl){ this.textEl.style.width=this.imgW+'px'; this.textEl.style.height=this.imgH+'px'; }",
-      "    this.measureSvg.setAttribute('width', String(this.imgW));",
-      "    this.measureSvg.setAttribute('height', String(this.imgH));",
-      "  };",
-      "",
-      "  PublishMap.prototype.fitToView=function(){",
-      "    var r=this.viewportEl.getBoundingClientRect();",
-      "    this.vw=r.width||1; this.vh=r.height||1;",
-      "    if(!this.imgW || !this.imgH) return;",
-      "    var s=Math.min(this.vw/this.imgW, this.vh/this.imgH);",
-      "    this.scale=clamp(s, this.cfg.minZoom, this.cfg.maxZoom);",
-      "    this.tx=(this.vw - this.imgW*this.scale)/2;",
-      "    this.ty=(this.vh - this.imgH*this.scale)/2;",
-      "    this.applyTransform();",
-      "  };",
-      "",
-      "  PublishMap.prototype.applyTransform=function(){",
-      "    var scaledW=this.imgW*this.scale, scaledH=this.imgH*this.scale;",
-      "    var minTx=this.vw - scaledW, maxTx=0;",
-      "    var minTy=this.vh - scaledH, maxTy=0;",
-      "    if(scaledW <= this.vw) this.tx=(this.vw-scaledW)/2; else this.tx=clamp(this.tx, minTx, maxTx);",
-      "    if(scaledH <= this.vh) this.ty=(this.vh-scaledH)/2; else this.ty=clamp(this.ty, minTy, maxTy);",
-      "    this.worldEl.style.transform='translate3d('+Math.round(this.tx)+'px,'+Math.round(this.ty)+'px,0) scale('+this.scale+')';",
-      "    this.updateMarkerInvScale();",
-      "    this.updateMarkerZoomVisibility();",
-      "    this.renderCanvas();",
-      "    this.renderMeasure();",
-      "  };",
-      "  PublishMap.prototype.onResize=function(){",
-      "    if(!this.viewportEl) return;",
-      "    if(this.cfg.viewportFrame){",
-      "      this.applyViewportInset();",
-      "    }",
-      "    var r=this.viewportEl.getBoundingClientRect();",
-      "    this.vw=r.width||1; this.vh=r.height||1;",
-      "    if(this.responsiveEffective){",
-      "      this.fitToView();",
-      "    }else{",
-      "      // keep current view but re-clamp to new bounds",
-      "      this.applyTransform();",
-      "    }",
-      "    this.updateHudPinsForResize(r);",
-      "    this.renderMarkers();",
-      "    this.renderDrawings();",
-      "    this.renderTextLayers();",
-      "    this.renderCanvas();",
-      "    this.renderMeasure();",
-      "  };",
-      "",
-      "  PublishMap.prototype.panBy=function(dx,dy){ this.tx+=dx; this.ty+=dy; this.applyTransform(); };",
-      "",
-      "  PublishMap.prototype.onWheel=function(e){",
-      "    var factor=1.1;",
-      "    var step=Math.pow(factor, e.deltaY<0?1:-1);",
-      "    this.zoomAt(e.clientX,e.clientY,step);",
-      "  };",
-      "",
-      "  PublishMap.prototype.zoomAt=function(clientX,clientY,factor){",
-      "    var r=this.viewportEl.getBoundingClientRect();",
-      "    var cx=clamp(clientX-r.left,0,this.vw), cy=clamp(clientY-r.top,0,this.vh);",
-      "    var sOld=this.scale, sNew=clamp(sOld*factor,this.cfg.minZoom,this.cfg.maxZoom);",
-      "    var wx=(cx-this.tx)/sOld, wy=(cy-this.ty)/sOld;",
-      "    this.scale=sNew;",
-      "    this.tx=cx - wx*sNew;",
-      "    this.ty=cy - wy*sNew;",
-      "    this.applyTransform();",
-      "  };",
-      "",
-      "  PublishMap.prototype.updateMarkerInvScale=function(){",
-      "    var inv=1/this.scale;",
-      "    var nodes=this.markersEl.querySelectorAll('.zm-marker-inv');",
-      "    for(var i=0;i<nodes.length;i++) nodes[i].style.transform='scale('+inv+')';",
-      "  };",
-      "  PublishMap.prototype.updateMarkerZoomVisibility=function(){",
-      "    var s=this.scale;",
-      "    var nodes=this.host.querySelectorAll('.zm-marker');",
-      "    for(var i=0;i<nodes.length;i++){",
-      "      var el=nodes[i];",
-      "      var minStr=el.dataset ? el.dataset.minz : null;",
-      "      var maxStr=el.dataset ? el.dataset.maxz : null;",
-      "      var hasMin=!!(minStr&&minStr.length);",
-      "      var hasMax=!!(maxStr&&maxStr.length);",
-      "      var min=hasMin?parseFloat(minStr):NaN;",
-      "      var max=hasMax?parseFloat(maxStr):NaN;",
-      "      var visible = (!hasMin || (isFinite(min) && s>=min)) && (!hasMax || (isFinite(max) && s<=max));",
-      "      if(visible) el.classList.remove('zm-hidden'); else el.classList.add('zm-hidden');",
-      "    }",
-      "  };",
-      "  PublishMap.prototype.classifyHudMetaFromCurrentPosition=function(m, vpRect){",
-      "    var W = (vpRect && vpRect.width) ? vpRect.width : 1;",
-      "    var H = (vpRect && vpRect.height) ? vpRect.height : 1;",
-      "    var centerX = W/2, centerY = H/2;",
-      "    var eps = 1;",
-      "    var hudX = (typeof m.hudX==='number') ? m.hudX : 0;",
-      "    var hudY = (typeof m.hudY==='number') ? m.hudY : 0;",
-      "",
-      "    var modeX;",
-      "    if(Math.abs(hudX-centerX) <= eps){ modeX='center'; hudX=centerX; }",
-      "    else if(hudX > centerX){ modeX='right'; }",
-      "    else { modeX='left'; }",
-      "",
-      "    var modeY;",
-      "    if(Math.abs(hudY-centerY) <= eps){ modeY='center'; hudY=centerY; }",
-      "    else if(hudY > centerY){ modeY='bottom'; }",
-      "    else { modeY='top'; }",
-      "",
-      "    m.anchorSpace='viewport';",
-      "    m.hudX=hudX; m.hudY=hudY;",
-      "    m.hudModeX=modeX; m.hudModeY=modeY;",
-      "    m.hudLastWidth=W; m.hudLastHeight=H;",
-      "    m.x = W>0 ? hudX/W : 0;",
-      "    m.y = H>0 ? hudY/H : 0;",
-      "  };",
-      "  PublishMap.prototype.updateHudPinsForResize=function(vpRect){",
-      "    if(!this.data || !Array.isArray(this.data.markers)) return;",
-      "    var W = (vpRect && vpRect.width) ? vpRect.width : 1;",
-      "    var H = (vpRect && vpRect.height) ? vpRect.height : 1;",
-      "    var centerX=W/2, centerY=H/2;",
-      "",
-      "    for(var i=0;i<this.data.markers.length;i++){",
-      "      var m=this.data.markers[i];",
-      "      if(!m || m.anchorSpace!=='viewport') continue;",
-      "",
-      "      var hasLast = (typeof m.hudLastWidth==='number' && isFinite(m.hudLastWidth) && typeof m.hudLastHeight==='number' && isFinite(m.hudLastHeight));",
-      "      if(!hasLast){",
-      "        if(typeof m.hudX!=='number' || typeof m.hudY!=='number'){",
-      "          var approxX = (typeof m.x==='number' ? m.x : 0.5) * W;",
-      "          var approxY = (typeof m.y==='number' ? m.y : 0.5) * H;",
-      "          m.hudX = approxX; m.hudY = approxY;",
-      "        }",
-      "        this.classifyHudMetaFromCurrentPosition(m, vpRect);",
-      "        continue;",
-      "      }",
-      "",
-      "      var lastW = m.hudLastWidth || W;",
-      "      var lastH = m.hudLastHeight || H;",
-      "      var dW = W - lastW;",
-      "      var dH = H - lastH;",
-      "",
-      "      var hudX = (typeof m.hudX==='number') ? m.hudX : ((typeof m.x==='number'?m.x:0.5)*W);",
-      "      var hudY = (typeof m.hudY==='number') ? m.hudY : ((typeof m.y==='number'?m.y:0.5)*H);",
-      "",
-      "      var modeX = m.hudModeX || 'center';",
-      "      if(modeX==='right'){",
-      "        hudX += dW;",
-      "        if(hudX <= centerX){ hudX=centerX; m.hudModeX='center'; }",
-      "      }else if(modeX==='center'){",
-      "        hudX = centerX;",
-      "      }",
-      "",
-      "      var modeY = m.hudModeY || 'center';",
-      "      if(modeY==='bottom'){",
-      "        hudY += dH;",
-      "        if(hudY <= centerY){ hudY=centerY; m.hudModeY='center'; }",
-      "      }else if(modeY==='center'){",
-      "        hudY = centerY;",
-      "      }",
-      "",
-      "      m.hudX=hudX; m.hudY=hudY;",
-      "      m.hudLastWidth=W; m.hudLastHeight=H;",
-      "      m.x = W>0 ? hudX/W : 0;",
-      "      m.y = H>0 ? hudY/H : 0;",
-      "    }",
-      "  };",
-      "  PublishMap.prototype.getIconProfile=function(iconKey){",
-      "    var icons = (this.library && Array.isArray(this.library.icons)) ? this.library.icons : [];",
-      "    var key = iconKey || (icons[0] ? icons[0].key : '');",
-      "    for(var i=0;i<icons.length;i++){ if(icons[i] && icons[i].key===key) return icons[i]; }",
-      "    if(icons[0]) return icons[0];",
-      "    // builtin red pin fallback",
-      `    return { key:'builtin', pathOrDataUrl:'data:image/svg+xml;charset=UTF-8,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path fill="#d23c3c" d="M12 2a7 7 0 0 0-7 7c0 5.25 7 13 7 13s7-7.75 7-13a7 7 0 0 0-7-7m0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5Z"/></svg>'), size:24, anchorX:12, anchorY:12, rotationDeg:0 };`,
-      "  };",
-      "  PublishMap.prototype.getPinSize=function(iconKey, fallback){",
-      "    var ovs = (this.data && this.data.pinSizeOverrides && typeof this.data.pinSizeOverrides==='object') ? this.data.pinSizeOverrides : null;",
-      "    if(ovs && iconKey && Object.prototype.hasOwnProperty.call(ovs, iconKey)){",
-      "      var v = ovs[iconKey];",
-      "      if(typeof v==='number' && isFinite(v) && v>0) return v;",
-      "    }",
-      "    return fallback;",
-      "  };",
-      "  PublishMap.prototype.getMarkerIconSize=function(m, iconKey, fallback){",
-      "    var own = m && m.sizeOverride;",
-      "    if(typeof own==='number' && isFinite(own) && own>0) return Math.round(own);",
-      "    return this.getPinSize(iconKey, fallback);",
-      "  };",
-      "  PublishMap.prototype.getIconDefaultLink=function(iconKey){",
-      "    var prof = this.getIconProfile(iconKey);",
-      "    var raw = prof && prof.defaultLink;",
-      "    var s = (typeof raw==='string') ? raw.trim() : '';",
-      "    return s ? s : '';",
-      "  };",
-      "  PublishMap.prototype.findSwapPresetById=function(id){",
-      "    var cols = (this.library && Array.isArray(this.library.baseCollections)) ? this.library.baseCollections : [];",
-      "    for(var i=0;i<cols.length;i++){",
-      "      var inc = cols[i] && cols[i].include;",
-      "      var list = inc && Array.isArray(inc.swapPins) ? inc.swapPins : [];",
-      "      for(var j=0;j<list.length;j++){",
-      "        var sp = list[j];",
-      "        if(sp && sp.id === id) return sp;",
-      "      }",
-      "    }",
-      "    return null;",
-      "  };",
-      "  PublishMap.prototype.getSwapFrameForMarker=function(m){",
-      "    if(!m || m.type !== 'swap' || !m.swapKey) return null;",
-      "    var preset = this.findSwapPresetById(m.swapKey);",
-      "    if(!preset || !Array.isArray(preset.frames) || preset.frames.length===0) return null;",
-      "    var raw = (typeof m.swapIndex==='number') ? m.swapIndex : 0;",
-      "    var n = preset.frames.length;",
-      "    var idx = ((raw % n) + n) % n;",
-      "    return preset.frames[idx] || null;",
-      "  };",
-      "  PublishMap.prototype.getSwapEffectiveLink=function(m){",
-      "    if(!m || m.type !== 'swap' || !m.swapKey) return (m && m.link) ? String(m.link).trim() : '';",
-      "    var preset = this.findSwapPresetById(m.swapKey);",
-      "    if(!preset || !Array.isArray(preset.frames) || preset.frames.length===0) return (m.link||'').trim();",
-      "    var raw = (typeof m.swapIndex==='number') ? m.swapIndex : 0;",
-      "    var n = preset.frames.length;",
-      "    var idx = ((raw % n) + n) % n;",
-      "    // per-marker overrides",
-      "    if(m.swapLinks && typeof m.swapLinks==='object'){",
-      "      var ov = m.swapLinks[idx];",
-      "      if(typeof ov==='string' && ov.trim()) return ov.trim();",
-      "    }",
-      "    // preset frame link",
-      "    var fr = preset.frames[idx];",
-      "    if(fr && typeof fr.link==='string' && fr.link.trim()) return fr.link.trim();",
-      "    // icon default link",
-      "    if(fr && fr.iconKey){",
-      "      var dl = this.getIconDefaultLink(fr.iconKey);",
-      "      if(dl) return dl;",
-      "    }",
-      "    return (m.link||'').trim();",
-      "  };",
-      "  PublishMap.prototype.advanceSwapPin=function(m){",
-      "    if(!m || m.type !== 'swap' || !m.swapKey) return;",
-      "    var preset = this.findSwapPresetById(m.swapKey);",
-      "    if(!preset || !Array.isArray(preset.frames) || preset.frames.length===0) return;",
-      "    var raw = (typeof m.swapIndex==='number') ? m.swapIndex : 0;",
-      "    var n = preset.frames.length;",
-      "    m.swapIndex = ((raw + 1) % n + n) % n;",
-      "  };",
-      "  PublishMap.prototype.showToast=function(text){",
-      "    if(!this.toastEl) return;",
-      "    this.toastEl.textContent=String(text||'');",
-      "    this.toastEl.classList.add('zm-toast-visible');",
-      "    var self=this;",
-      "    if(self.toastTimer) clearTimeout(self.toastTimer);",
-      "    self.toastTimer=setTimeout(function(){",
-      "      if(!self.toastEl) return;",
-      "      self.toastEl.classList.remove('zm-toast-visible');",
-      "    }, 2600);",
-      "  };",
-      "  function rollDiceSpecs(rolls){",
-      "    var rs = Array.isArray(rolls) ? rolls : [];",
-      "    if(!rs.length) rs=[{count:1,sides:20}];",
-      "    var total=0;",
-      "    var parts=[];",
-      "    for(var i=0;i<rs.length;i++){",
-      "      var r=rs[i]||{};",
-      "      var n=Math.max(1, Math.round(Number(r.count||1)));",
-      "      var s=Math.max(2, Math.round(Number(r.sides||20)));",
-      "      var vals=[];",
-      "      for(var j=0;j<n;j++){",
-      "        var v=1+Math.floor(Math.random()*s);",
-      "        vals.push(v);",
-      "        total+=v;",
-      "      }",
-      "      parts.push(n+'d'+s+'=['+vals.join(', ')+']');",
-      "    }",
-      "    return { total: total, details: parts.join(' + ') };",
-      "  }",
-      "  PublishMap.prototype.renderMarkers=function(){",
-      "    var self=this;",
-      "    if(!self.data) return;",
-      "    var layers = Array.isArray(self.data.layers) ? self.data.layers : [];",
-      "    var markers = Array.isArray(self.data.markers) ? self.data.markers : [];",
-      "",
-      "    var visible = new Set();",
-      "    var activeBase = self.getActiveBasePath();",
-      "    for(var i=0;i<layers.length;i++){",
-      "      var l=layers[i];",
-      "      if(l && l.boundBase && String(l.boundBase).trim() && String(l.boundBase).trim()!==String(activeBase||'').trim()) continue;",
-      "      if(l && l.visible!==false && !isHiddenLayerName(l.name||'')) visible.add(l.id);",
-      "    }",
-      "",
-      "    self.markersEl.innerHTML='';",
-      "    if(self.hudMarkersEl) self.hudMarkersEl.innerHTML='';",
-      "",
-      "    var vpRect = self.viewportEl.getBoundingClientRect();",
-      "    var vw = vpRect.width || 1;",
-      "    var vh = vpRect.height || 1;",
-      "    self.updateHudPinsForResize(vpRect);",
-      "",
-      "    for(var j=0;j<markers.length;j++){",
-      "      var m=markers[j];",
-      "      if(!m) continue;",
-      "      var layerId = (m.layer!=null ? m.layer : 'default');",
-      "      if(!visible.has(layerId)) continue;",
-      "",
-      "      var isHud = (m.anchorSpace === 'viewport');",
-      "      var container = isHud ? self.hudMarkersEl : self.markersEl;",
-      "      if(!container) continue;",
-      "",
-      "      var left, top;",
-      "      if(isHud){",
-      "        left = (typeof m.hudX==='number') ? m.hudX : ((typeof m.x==='number'?m.x:0.5) * vw);",
-      "        top  = (typeof m.hudY==='number') ? m.hudY : ((typeof m.y==='number'?m.y:0.5) * vh);",
-      "      }else{",
-      "        left = (typeof m.x==='number'?m.x:0) * self.imgW;",
-      "        top  = (typeof m.y==='number'?m.y:0) * self.imgH;",
-      "      }",
-      "",
-      "      var host = document.createElement('div');",
-      "      host.className = isHud ? 'zm-marker zm-hud-marker' : 'zm-marker';",
-      "      host.style.left = left + 'px';",
-      "      host.style.top  = top  + 'px';",
-      "      host.dataset && (host.dataset.id = m.id || '');",
-      "      host.addEventListener('pointerdown', function(ev){ ev.stopPropagation(); });",
-      "      // Determine effective link (swap pins can override per-frame)",
-      "      var link = '';",
-      "      if(m.type === 'swap'){ link = self.getSwapEffectiveLink(m); }",
-      "      else link = (m.link||'').trim();",
-      '      // Page preview on Publish: use a real <a class="internal-link">',
-      "      var clickTarget = host;",
-      "      if(link){",
-      "        var a = document.createElement('a');",
-      "        a.className = 'internal-link';",
-      "        a.setAttribute('data-href', stripWikiBrackets(link));",
-      "        a.href = resolveNoteHref(link);",
-      "        a.style.display = 'block';",
-      "        a.style.textDecoration = 'none';",
-      "        a.style.color = 'inherit';",
-      "        clickTarget = a;",
-      "        host.appendChild(a);",
-      "      }",
-      "",
-      "      // Zoom visibility (world pins only)",
-      "      if(!isHud && m.type !== 'sticker'){",
-      "        if(typeof m.minZoom==='number') host.dataset.minz = String(m.minZoom);",
-      "        if(typeof m.maxZoom==='number') host.dataset.maxz = String(m.maxZoom);",
-      "      }",
-      "",
-      "      var tooltip = (m.tooltip||'').trim();",
-      "      if(tooltip){",
-      "        host.title = tooltip;",
-      "      }",
-      "",
-      "      // render icon",
-      "      if(m.type === 'sticker'){",
-      "        var size = Math.max(1, Math.round(m.stickerSize || 64));",
-      "        var anch = document.createElement('div');",
-      "        anch.className='zm-marker-anchor';",
-      "        anch.style.transform='translate(' + (-size/2) + 'px,' + (-size/2) + 'px)';",
-      "        var img = document.createElement('img');",
-      "        img.className='zm-marker-icon';",
-      "        img.src = resolveAssetUrl(m.stickerPath || '', false);",
-      "        img.style.width = size + 'px';",
-      "        anch.appendChild(img);",
-      "        clickTarget.appendChild(anch);",
-      "      }else{",
-      "        var effectiveKey = m.iconKey;",
-      "        if(m.type === 'swap'){",
-      "          var fr = self.getSwapFrameForMarker(m);",
-      "          if(fr && fr.iconKey) effectiveKey = fr.iconKey;",
-      "        }",
-      "        var prof = self.getIconProfile(effectiveKey);",
-      "        var src0 = (prof.pathOrDataUrl || '');",
-      "        var mc = (m.iconColor!=null) ? String(m.iconColor).trim() : '';",
-      "        if(mc && isSvgDataUrl(src0)) src0 = getTintedSvgDataUrl(src0, mc);",
-      "        var imgUrl = resolveAssetUrl(src0, false);",
-      "        var pinSize = self.getMarkerIconSize(m, effectiveKey, (prof.size||24));",
-      "        var isScaleLike = (m.scaleLikeSticker===true);",
-      "        var anch2;",
-      "        var inv=null;",
-      "        if(isHud || isScaleLike){",
-      "          anch2 = document.createElement('div');",
-      "          anch2.className='zm-marker-anchor';",
-      "          anch2.style.transform='translate(' + (- (prof.anchorX||0)) + 'px,' + (- (prof.anchorY||0)) + 'px)';",
-      "          var img2 = document.createElement('img');",
-      "          img2.className='zm-marker-icon';",
-      "          img2.src = imgUrl;",
-      "          img2.style.width = pinSize + 'px';",
-      "          if(prof.rotationDeg) img2.style.transform='rotate(' + prof.rotationDeg + 'deg)';",
-      "          anch2.appendChild(img2);",
-      "          clickTarget.appendChild(anch2);",
-      "        }else{",
-      "          inv = document.createElement('div');",
-      "          inv.className='zm-marker-inv';",
-      "          inv.style.transform='scale(' + (1/self.scale) + ')';",
-      "          anch2 = document.createElement('div');",
-      "          anch2.className='zm-marker-anchor';",
-      "          anch2.style.transform='translate(' + (- (prof.anchorX||0)) + 'px,' + (- (prof.anchorY||0)) + 'px)';",
-      "          var img3 = document.createElement('img');",
-      "          img3.className='zm-marker-icon';",
-      "          img3.src = imgUrl;",
-      "          img3.style.width = pinSize + 'px';",
-      "          if(prof.rotationDeg) img3.style.transform='rotate(' + prof.rotationDeg + 'deg)';",
-      "          anch2.appendChild(img3);",
-      "          inv.appendChild(anch2);",
-      "          clickTarget.appendChild(inv);",
-      "        }",
-      "",
-      "        // Always-visible tooltip label (caption)",
-      "        if(m.tooltipLabelAlways===true && typeof m.tooltip==='string' && m.tooltip.trim()){",
-      "          var pos = (m.tooltipLabelPosition==='above') ? 'above' : 'below';",
-      "          var gap = 6;",
-      "          var offX = numOr(m.tooltipLabelOffsetX, 0);",
-      "          var offY = numOr(m.tooltipLabelOffsetY, 0);",
-      "          var xOff = ((pinSize/2) - (prof.anchorX||0)) + offX;",
-      "          var yOffBase = (pos==='above') ? (-( (prof.anchorY||0) + gap )) : ((pinSize - (prof.anchorY||0) + gap));",
-      "          var yOff = yOffBase + offY;",
-      "          var parent = (isHud || isScaleLike) ? host : (inv || host);",
-      "          var lbl = document.createElement('div');",
-      "          lbl.className='zm-marker-label';",
-      "          lbl.textContent=m.tooltip.trim();",
-      "          lbl.style.left = xOff + 'px';",
-      "          lbl.style.top = yOff + 'px';",
-      "          lbl.style.transform = (pos==='above') ? 'translate(-50%, -100%)' : 'translate(-50%, 0)';",
-      "          parent.appendChild(lbl);",
-      "        }",
-      "      }",
-      "      if(m.type === 'swap'){",
-      "        (function(marker){",
-      "          host.addEventListener('contextmenu', function(ev){",
-      "            ev.preventDefault();",
-      "            ev.stopPropagation();",
-      "            self.advanceSwapPin(marker);",
-      "            self.renderMarkers();",
-      "          });",
-      "        })(m);",
-      "      }",
-      "      if(m.type === 'switch'){",
-      "        (function(marker){",
-      "          host.addEventListener('contextmenu', function(ev){",
-      "            ev.preventDefault();",
-      "            ev.stopPropagation();",
-      "            var rotate = (marker.switchRotate===true) || !(marker.switchBase && String(marker.switchBase).trim());",
-      "            if(rotate){",
-      "              var bases=self.getBasesNormalized();",
-      "              if(!bases.length) return;",
-      "              var cur=self.getActiveBasePath();",
-      "              var idx=-1;",
-      "              for(var i=0;i<bases.length;i++){ if(bases[i].path===cur){ idx=i; break; } }",
-      "              var next=bases[((idx>=0?idx:0)+1)%bases.length];",
-      "              if(next && next.path) self.setActiveBase(next.path);",
-      "              return;",
-      "            }",
-      "            var t=String(marker.switchBase||'').trim();",
-      "            if(t) self.setActiveBase(t);",
-      "          });",
-      "        })(m);",
-      "      }",
-      "",
-      "      if(m.type === 'dice'){",
-      "        (function(marker){",
-      "          host.addEventListener('click', function(ev){",
-      "            ev.preventDefault();",
-      "            ev.stopPropagation();",
-      "            var res=rollDiceSpecs(marker.diceRolls);",
-      "            self.showToast('Roll: ' + (marker.tooltip||'') + '\\n' + res.details + '\\nTotal: ' + res.total);",
-      "            host.title = 'Total: ' + res.total;",
-      "          });",
-      "        })(m);",
-      "      }",
-      "      container.appendChild(host);",
-      "    }",
-      "",
-      "    self.updateMarkerZoomVisibility();",
-      "  };",
-      "",
-      "  PublishMap.prototype.renderOverlays=function(){",
-      "    // v0.2: if markers data includes overlays, use them; else none.",
-      "    var arr = this.getOverlaysNormalized();",
-      "    var textRaster = this.getTextLayerRasterOverlayPath();",
-      "    this.overlaysEl.innerHTML='';",
-      "    for(var i=0;i<arr.length;i++){",
-      "      var o=arr[i];",
-      "      if(!o || o.visible===false) continue;",
-      "      var img=document.createElement('img');",
-      "      img.className='zm-overlay-image';",
-      "      img.src=resolveAssetUrl(o.path||'', false);",
-      "      this.overlaysEl.appendChild(img);",
-      "    }",
-      "    if(textRaster){",
-      "      var self=this;",
-      "      var img2=document.createElement('img');",
-      "      img2.className='zm-overlay-image';",
-      "      img2.onload=function(){",
-      "        self.textRasterFailed=false;",
-      "        self.renderTextLayers();",
-      "      };",
-      "      img2.onerror=function(){",
-      "        self.textRasterFailed=true;",
-      "        self.renderTextLayers();",
-      "      };",
-      "      img2.src=resolveAssetUrl(textRaster, false);",
-      "      this.overlaysEl.appendChild(img2);",
-      "    }",
-      "  };",
-      "  PublishMap.prototype.renderDrawings=function(){",
-      "    var self=this;",
-      "    if(!self.drawSvg || !self.drawLayer || !self.drawDefs) return;",
-      "    self.drawSvg.setAttribute('width', String(self.imgW));",
-      "    self.drawSvg.setAttribute('height', String(self.imgH));",
-      "    self.drawLayer.innerHTML='';",
-      "    self.drawDefs.innerHTML='';",
-      "    if(self.drawHitboxesEl) self.drawHitboxesEl.innerHTML='';",
-      "    var drawings = (self.data && Array.isArray(self.data.drawings)) ? self.data.drawings : [];",
-      "    if(!drawings.length) return;",
-      "    var visibleDrawLayers = {};",
-      "    var activeBase = self.getActiveBasePath();",
-      "    var drawLayers = (self.data && Array.isArray(self.data.drawLayers)) ? self.data.drawLayers : [];",
-      "    for(var i=0;i<drawLayers.length;i++){",
-      "      var dl=drawLayers[i];",
-      "      if(!dl || dl.visible!==true) continue;",
-      "      if(dl.boundBase && String(dl.boundBase).trim() && String(dl.boundBase).trim()!==String(activeBase||'').trim()) continue;",
-      "      visibleDrawLayers[dl.id]=true;",
-      "    }",
-      "    function toAbs(nx,ny){ return { x: nx*self.imgW, y: ny*self.imgH }; }",
-      "    function clamp01(n){ return Math.min(1, Math.max(0, n)); }",
-      "    function addArrowMarker(id,color){",
-      "      var ns='http://www.w3.org/2000/svg';",
-      "      var m=document.createElementNS(ns,'marker');",
-      "      m.setAttribute('id', id);",
-      "      m.setAttribute('viewBox','0 0 10 10');",
-      "      m.setAttribute('refX','10');",
-      "      m.setAttribute('refY','5');",
-      "      m.setAttribute('markerWidth','6');",
-      "      m.setAttribute('markerHeight','6');",
-      "      m.setAttribute('orient','auto');",
-      "      m.setAttribute('markerUnits','strokeWidth');",
-      "      var p=document.createElementNS(ns,'path');",
-      "      p.setAttribute('d','M 0 0 L 10 5 L 0 10 z');",
-      "      p.setAttribute('fill', color);",
-      "      m.appendChild(p);",
-      "      self.drawDefs.appendChild(m);",
-      "      return 'url(#'+id+')';",
-      "    }",
-      "    function setStroke(el, style){",
-      "      var stroke=(style.strokeColor||'#ff0000').trim() || '#ff0000';",
-      "      var w = (typeof style.strokeWidth==='number' && isFinite(style.strokeWidth) && style.strokeWidth>0) ? style.strokeWidth : 2;",
-      "      el.setAttribute('stroke', stroke);",
-      "      el.setAttribute('stroke-width', String(w));",
-      "      el.setAttribute('fill','none');",
-      "      if(Array.isArray(style.strokeDash) && style.strokeDash.length){ el.setAttribute('stroke-dasharray', style.strokeDash.join(' ')); }",
-      "      var op = (typeof style.strokeOpacity==='number' && isFinite(style.strokeOpacity)) ? clamp01(style.strokeOpacity) : 1;",
-      "      if(op < 1) el.setAttribute('stroke-opacity', String(op));",
-      "      return stroke;",
-      "    }",
-      "    function bboxFromAbsPoints(pts){",
-      "      var minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;",
-      "      for(var k=0;k<pts.length;k++){",
-      "        var p=pts[k];",
-      "        if(!p) continue;",
-      "        minX=Math.min(minX,p.x); maxX=Math.max(maxX,p.x);",
-      "        minY=Math.min(minY,p.y); maxY=Math.max(maxY,p.y);",
-      "      }",
-      "      if(!isFinite(minX)) return null;",
-      "      return { minX:minX, minY:minY, w:(maxX-minX), h:(maxY-minY) };",
-      "    }",
-      "    function maybeFillShape(shape, d){",
-      "      var style=d.style||{};",
-      "      if(d.kind==='polyline') return;",
-      "      var pattern = style.fillPattern || (style.fillColor ? 'solid' : 'none');",
-      "      if(pattern==='none') return;",
-      "      // baked patterns: render baked svg image if present",
-      "      if((pattern==='striped' || pattern==='cross' || pattern==='wavy') && d.bakedPath){",
-      "        var box = null;",
-      "        if(d.kind==='rect' && d.rect){",
-      "          var a=toAbs(d.rect.x0,d.rect.y0), b=toAbs(d.rect.x1,d.rect.y1);",
-      "          box={ minX:Math.min(a.x,b.x), minY:Math.min(a.y,b.y), w:Math.abs(a.x-b.x), h:Math.abs(a.y-b.y) };",
-      "        } else if(d.kind==='circle' && d.circle){",
-      "          var c=toAbs(d.circle.cx,d.circle.cy);",
-      "          var r=d.circle.r*Math.max(self.imgW,self.imgH);",
-      "          box={ minX:c.x-r, minY:c.y-r, w:r*2, h:r*2 };",
-      "        } else if(d.kind==='polygon' && Array.isArray(d.polygon) && d.polygon.length>=2){",
-      "          var abs=[]; for(var i=0;i<d.polygon.length;i++){ abs.push(toAbs(d.polygon[i].x,d.polygon[i].y)); }",
-      "          box=bboxFromAbsPoints(abs);",
-      "        }",
-      "        if(box && box.w>0 && box.h>0){",
-      "          var ns='http://www.w3.org/2000/svg';",
-      "          var img=document.createElementNS(ns,'image');",
-      "          img.setAttribute('href', resolveAssetUrl(d.bakedPath, false));",
-      "          img.setAttribute('x', String(box.minX));",
-      "          img.setAttribute('y', String(box.minY));",
-      "          img.setAttribute('width', String(box.w));",
-      "          img.setAttribute('height', String(box.h));",
-      "          img.classList.add('zm-draw__shape');",
-      "          self.drawLayer.appendChild(img);",
-      "          return;",
-      "        }",
-      "      }",
-      "      // solid fallback fill",
-      "      var fc=(style.fillColor||'#ff0000').trim() || '#ff0000';",
-      "      var fo=(typeof style.fillOpacity==='number' && isFinite(style.fillOpacity)) ? clamp01(style.fillOpacity) : 0.15;",
-      "      var fill=shape.cloneNode(false);",
-      "      fill.classList.add('zm-draw__shape');",
-      "      fill.setAttribute('fill', fc);",
-      "      fill.setAttribute('fill-opacity', String(fo));",
-      "      fill.setAttribute('stroke','none');",
-      "      self.drawLayer.appendChild(fill);",
-      "    }",
-      "    function polylineMidAndAngle(absPts){",
-      "      var total=0;",
-      "      for(var i=1;i<absPts.length;i++){",
-      "        total += Math.hypot(absPts[i].x-absPts[i-1].x, absPts[i].y-absPts[i-1].y);",
-      "      }",
-      "      if(total<=0) return null;",
-      "      var target=total/2, acc=0;",
-      "      for(var j=1;j<absPts.length;j++){",
-      "        var p0=absPts[j-1], p1=absPts[j];",
-      "        var seg=Math.hypot(p1.x-p0.x, p1.y-p0.y);",
-      "        if(acc+seg>=target && seg>0){",
-      "          var t=(target-acc)/seg;",
-      "          var x=p0.x+(p1.x-p0.x)*t;",
-      "          var y=p0.y+(p1.y-p0.y)*t;",
-      "          var ang=Math.atan2(p1.y-p0.y, p1.x-p0.x)*180/Math.PI;",
-      "          return { x:x, y:y, angleDeg:ang, pxLen: total };",
-      "        }",
-      "        acc += seg;",
-      "      }",
-      "      return null;",
-      "    }",
-      "    function showRegionTooltip(clientX, clientY, text){",
-      "      var body=String(text||'').trim();",
-      "      if(!body) return;",
-      "      if(!self.tooltip){",
-      "        self.tooltip=document.createElement('div');",
-      "        self.tooltip.className='zm-tooltip';",
-      "        self.tooltip.addEventListener('mouseenter', function(){ if(self.tooltipTimer){ clearTimeout(self.tooltipTimer); self.tooltipTimer=0; } });",
-      "        self.tooltip.addEventListener('mouseleave', function(){ hideRegionTooltipSoon(); });",
-      "        self.hudLayerEl.appendChild(self.tooltip);",
-      "      }",
-      "      if(self.tooltipTimer){ clearTimeout(self.tooltipTimer); self.tooltipTimer=0; }",
-      "      self.tooltip.innerHTML='';",
-      "      var bodyEl=document.createElement('div');",
-      "      bodyEl.className='zm-tooltip__body';",
-      "      bodyEl.textContent=body;",
-      "      self.tooltip.appendChild(bodyEl);",
-      "      positionRegionTooltip(clientX, clientY);",
-      "      self.tooltip.classList.add('zm-tooltip-visible');",
-      "    }",
-      "    function positionRegionTooltip(clientX, clientY){",
-      "      if(!self.tooltip) return;",
-      "      var pad=12;",
-      "      var vpRect=self.hudLayerEl.getBoundingClientRect();",
-      "      var x=clientX-vpRect.left+pad;",
-      "      var y=clientY-vpRect.top+pad;",
-      "      var rect=self.tooltip.getBoundingClientRect();",
-      "      var vw=vpRect.width||1;",
-      "      var vh=vpRect.height||1;",
-      "      if(x+rect.width>vw) x=clientX-vpRect.left-rect.width-pad;",
-      "      if(x<0) x=pad;",
-      "      if(y+rect.height>vh) y=clientY-vpRect.top-rect.height-pad;",
-      "      if(y<0) y=pad;",
-      "      self.tooltip.style.left=Math.round(x)+'px';",
-      "      self.tooltip.style.top=Math.round(y)+'px';",
-      "    }",
-      "    function hideRegionTooltipSoon(delay){",
-      "      if(!self.tooltip) return;",
-      "      if(self.tooltipTimer) clearTimeout(self.tooltipTimer);",
-      "      self.tooltipTimer=setTimeout(function(){",
-      "        if(self.tooltip) self.tooltip.classList.remove('zm-tooltip-visible');",
-      "        self.tooltipTimer=0;",
-      "      }, typeof delay==='number' ? delay : 150);",
-      "    }",
-      "    function openRegionLink(rawLink,newTab){",
-      "      var link=String(rawLink||'').trim();",
-      "      if(!link) return;",
-      "      var href=resolveNoteHref(link);",
-      "      if(newTab){",
-      "        try{ window.open(href,'_blank','noopener'); return; }catch(_e){}",
-      "      }",
-      "      window.location.href=href;",
-      "    }",
-      "    for(var n=0;n<drawings.length;n++){",
-      "      var d=drawings[n];",
-      "      if(!d || d.visible===false) continue;",
-      "      if(drawLayers.length && !visibleDrawLayers[d.layerId]) continue;",
-      "      var ns='http://www.w3.org/2000/svg';",
-      "      var style=d.style||{};",
-      "      var regionLink=(typeof style.regionLink==='string') ? style.regionLink.trim() : '';",
-      "      var regionTooltip=(typeof style.regionTooltip==='string') ? style.regionTooltip.trim() : '';",
-      "      var regionInvisible=(style.regionInvisible===true);",
-      "      var regionHoverPreview=(style.regionHoverPreview!==false);",
-      "      var canRegion=(d.kind==='rect' || d.kind==='circle' || d.kind==='polygon');",
-      "      var interactiveRegion=canRegion && (regionInvisible || !!regionLink || !!regionTooltip);",
-      "      var shape=null;",
-      "      var bounds=null;",
-      "      if(d.kind==='circle' && d.circle){",
-      "        var c=toAbs(d.circle.cx,d.circle.cy);",
-      "        var r=d.circle.r*Math.max(self.imgW,self.imgH);",
-      "        var el=document.createElementNS(ns,'circle');",
-      "        el.setAttribute('cx', String(c.x));",
-      "        el.setAttribute('cy', String(c.y));",
-      "        el.setAttribute('r', String(r));",
-      "        bounds={ minX:c.x-r, minY:c.y-r, w:r*2, h:r*2, kind:'circle' };",
-      "        shape=el;",
-      "      } else if(d.kind==='rect' && d.rect){",
-      "        var a=toAbs(d.rect.x0,d.rect.y0), b=toAbs(d.rect.x1,d.rect.y1);",
-      "        var x=Math.min(a.x,b.x), y=Math.min(a.y,b.y), w=Math.abs(a.x-b.x), h=Math.abs(a.y-b.y);",
-      "        var el2=document.createElementNS(ns,'rect');",
-      "        el2.setAttribute('x', String(x));",
-      "        el2.setAttribute('y', String(y));",
-      "        el2.setAttribute('width', String(w));",
-      "        el2.setAttribute('height', String(h));",
-      "        bounds={ minX:x, minY:y, w:w, h:h, kind:'rect' };",
-      "        shape=el2;",
-      "      } else if(d.kind==='polygon' && Array.isArray(d.polygon) && d.polygon.length>=2){",
-      "        var pth=document.createElementNS(ns,'path');",
-      "        var dd='';",
-      "        var polyAbs=[];",
-      "        for(var i2=0;i2<d.polygon.length;i2++){",
-      "          var p=toAbs(d.polygon[i2].x, d.polygon[i2].y);",
-      "          polyAbs.push(p);",
-      "          dd += (i2===0?'M ':' L ') + p.x + ' ' + p.y;",
-      "        }",
-      "        dd += ' Z';",
-      "        pth.setAttribute('d', dd);",
-      "        var polyBox=bboxFromAbsPoints(polyAbs);",
-      "        if(polyBox) bounds={ minX:polyBox.minX, minY:polyBox.minY, w:polyBox.w, h:polyBox.h, kind:'polygon', pts:polyAbs };",
-      "        shape=pth;",
-      "      } else if(d.kind==='polyline' && Array.isArray(d.polyline) && d.polyline.length>=2){",
-      "        var pth2=document.createElementNS(ns,'path');",
-      "        var dd2='';",
-      "        var absPts=[];",
-      "        for(var i3=0;i3<d.polyline.length;i3++){",
-      "          var pp=toAbs(d.polyline[i3].x, d.polyline[i3].y);",
-      "          absPts.push(pp);",
-      "          dd2 += (i3===0?'M ':' L ') + pp.x + ' ' + pp.y;",
-      "        }",
-      "        pth2.setAttribute('d', dd2);",
-      "        pth2.setAttribute('stroke-linecap','round');",
-      "        pth2.setAttribute('stroke-linejoin','round');",
-      "        shape=pth2;",
-      "        // distance label",
-      "        if(style.distanceLabel){",
-      "          var mid=polylineMidAndAngle(absPts);",
-      "          if(mid){",
-      "            var txt=self.formatPolylineDistance(mid.pxLen);",
-      "            if(txt){",
-      "              var tEl=document.createElementNS(ns,'text');",
-      "              tEl.classList.add('zm-draw__label');",
-      "              tEl.setAttribute('x', String(mid.x));",
-      "              tEl.setAttribute('y', String(mid.y));",
-      "              tEl.setAttribute('text-anchor','middle');",
-      "              tEl.setAttribute('dominant-baseline','middle');",
-      "              tEl.setAttribute('fill', (style.strokeColor||'#ff0000'));",
-      "              if(Math.abs(mid.angleDeg)>0.01){ tEl.setAttribute('transform','rotate('+mid.angleDeg+' '+mid.x+' '+mid.y+')'); }",
-      "              tEl.textContent=txt;",
-      "              self.drawLayer.appendChild(tEl);",
-      "            }",
-      "          }",
-      "        }",
-      "      }",
-      "      if(!shape) continue;",
-      "      if(!regionInvisible){",
-      "        // fill below stroke",
-      "        maybeFillShape(shape, d);",
-      "        // stroke on top",
-      "        shape.classList.add('zm-draw__shape');",
-      "        var strokeColor=setStroke(shape, style);",
-      "        if(d.kind==='polyline' && style.arrowEnd){",
-      "          var mid='zm-arrow-'+String(d.id||n);",
-      "          var url=addArrowMarker(mid, strokeColor);",
-      "          shape.setAttribute('marker-end', url);",
-      "        }",
-      "        self.drawLayer.appendChild(shape);",
-      "      }",
-      "      if(interactiveRegion){",
-      "        var hitShape = shape.cloneNode(false);",
-      "        hitShape.classList.add('zm-draw__hit');",
-      "        hitShape.setAttribute('fill','#000');",
-      "        hitShape.setAttribute('fill-opacity','0.001');",
-      "        hitShape.setAttribute('stroke','none');",
-      "        hitShape.setAttribute('pointer-events','fill');",
-      "        hitShape.setAttribute('data-zm-region','1');",
-      "        if(regionLink){",
-      "          hitShape.classList.add('zm-draw__hit--link');",
-      "          hitShape.setAttribute('data-zm-region-link', normalizeInternalLinkTarget(regionLink));",
-      "          if(regionHoverPreview !== false){",
-      "            hitShape.classList.add('internal-link');",
-      "            hitShape.setAttribute('data-href', normalizeInternalLinkTarget(regionLink));",
-      "          }",
-      "        }",
-      "        if(regionTooltip){",
-      "          hitShape.setAttribute('data-zm-region-tooltip', regionTooltip);",
-      "        }",
-      "        (function(hitEl, regionLinkCur, regionTooltipCur, regionHoverPreviewCur){",
-      "          hitEl.addEventListener('mouseenter', function(ev){",
-      "            if(regionTooltipCur) showRegionTooltip(ev.clientX, ev.clientY, regionTooltipCur);",
-      "          });",
-      "          hitEl.addEventListener('mousemove', function(ev){",
-      "            if(self.tooltip && self.tooltip.classList.contains('zm-tooltip-visible')) positionRegionTooltip(ev.clientX, ev.clientY);",
-      "          });",
-      "          hitEl.addEventListener('mouseleave', function(){",
-      "            hideRegionTooltipSoon();",
-      "          });",
-      "          if(regionLinkCur){",
-      "            hitEl.addEventListener('click', function(ev){",
-      "              ev.preventDefault();",
-      "              ev.stopPropagation();",
-      "              hideRegionTooltipSoon(0);",
-      "              openRegionLink(regionLinkCur,false);",
-      "            });",
-      "            hitEl.addEventListener('auxclick', function(ev){",
-      "              if(ev.button!==1) return;",
-      "              ev.preventDefault();",
-      "              ev.stopPropagation();",
-      "              hideRegionTooltipSoon(0);",
-      "              openRegionLink(regionLinkCur,true);",
-      "            });",
-      "          }",
-      "          hitEl.addEventListener('contextmenu', function(ev){",
-      "            ev.preventDefault();",
-      "            ev.stopPropagation();",
-      "            hideRegionTooltipSoon(0);",
-      "            self.openContextMenu(ev.clientX, ev.clientY);",
-      "          });",
-      "        })(hitShape, regionLink, regionTooltip, regionHoverPreview);",
-      "        self.drawLayer.appendChild(hitShape);",
-      "      }",
-      "    }",
-      "  };",
-      "  PublishMap.prototype.ensureTextStyle=function(st){",
-      "    var s=st||{};",
-      "    return {",
-      "      fontFamily: (s.fontFamily||'var(--font-text)').trim() || 'var(--font-text)',",
-      "      fontSize: (typeof s.fontSize==='number' && isFinite(s.fontSize) && s.fontSize>1) ? s.fontSize : 14,",
-      "      color: (s.color||'var(--text-normal)').trim() || 'var(--text-normal)',",
-      "      fontWeight: (s.fontWeight!=null ? String(s.fontWeight).trim() : ''),",
-      "      italic: (s.italic===true),",
-      "      letterSpacing: (typeof s.letterSpacing==='number' && isFinite(s.letterSpacing)) ? s.letterSpacing : null,",
-      "      padLeft: (typeof s.padLeft==='number' && isFinite(s.padLeft) && s.padLeft>=0) ? s.padLeft : 0,",
-      "      padRight: (typeof s.padRight==='number' && isFinite(s.padRight) && s.padRight>=0) ? s.padRight : 0",
-      "    };",
-      "  };",
-      "  PublishMap.prototype.renderTextLayers=function(){",
-      "    var self=this;",
-      "    if(!self.textSvg || !self.textLayer) return;",
-      "    self.textSvg.setAttribute('width', String(self.imgW));",
-      "    self.textSvg.setAttribute('height', String(self.imgH));",
-      "    self.textLayer.innerHTML='';",
-      "    var raster=self.getTextLayerRasterOverlayPath();",
-      "    if(raster && !self.textRasterFailed) return;",
-      "    var layers = (self.data && Array.isArray(self.data.textLayers)) ? self.data.textLayers : [];",
-      "    if(!layers.length) return;",
-      "    var activeBase = self.getActiveBasePath();",
-      "    var ns='http://www.w3.org/2000/svg';",
-      "    function toAbs(nx,ny){ return { x:nx*self.imgW, y:ny*self.imgH }; }",
-      "    function mergeStyles(base, override){",
-      "      var out = {};",
-      "      var k;",
-      "      if(base && typeof base==='object'){",
-      "        for(k in base){",
-      "          if(Object.prototype.hasOwnProperty.call(base,k)) out[k]=base[k];",
-      "        }",
-      "      }",
-      "      if(override && typeof override==='object'){",
-      "        for(k in override){",
-      "          if(Object.prototype.hasOwnProperty.call(override,k)) out[k]=override[k];",
-      "        }",
-      "      }",
-      "      return out;",
-      "    }",
-      "    for(var i=0;i<layers.length;i++){",
-      "      var layer=layers[i];",
-      "      if(!layer) continue;",
-      "      if(layer.visible===false) continue;",
-      "      if(layer.boundBase && String(layer.boundBase).trim() && String(layer.boundBase).trim()!==String(activeBase||'').trim()) continue;",
-      "      var layerStyle=self.ensureTextStyle(layer.style);",
-      "      var boxes = Array.isArray(layer.boxes) ? layer.boxes : [];",
-      "      if(!boxes.length && Array.isArray(layer.lines) && layer.lines.length){",
-      "        boxes = [{",
-      "          id: '__legacy__',",
-      "          style: layer.style || {},",
-      "          lines: layer.lines",
-      "        }];",
-      "      }",
-      "      if(!boxes.length) continue;",
-      "      for(var bIdx=0;bIdx<boxes.length;bIdx++){",
-      "        var box=boxes[bIdx];",
-      "        if(!box) continue;",
-      "        var boxStyle=self.ensureTextStyle(mergeStyles(layerStyle, box.style));",
-      "        var lines = Array.isArray(box.lines) ? box.lines : [];",
-      "        if(!lines.length) continue;",
-      "        for(var j=0;j<lines.length;j++){",
-      "          var ln=lines[j];",
-      "          var txt=(ln && ln.text!=null) ? String(ln.text).trimEnd() : '';",
-      "          if(!txt) continue;",
-      "          var a=toAbs(ln.x0, ln.y0);",
-      "          var b=toAbs(ln.x1, ln.y1);",
-      "          var dx=b.x-a.x, dy=b.y-a.y;",
-      "          var angle=Math.atan2(dy,dx)*180/Math.PI;",
-      "          var x=a.x + (boxStyle.padLeft||0);",
-      "          var y=a.y;",
-      "          var t=document.createElementNS(ns,'text');",
-      "          t.setAttribute('x', String(x));",
-      "          t.setAttribute('y', String(y));",
-      "          t.textContent=txt;",
-      "          t.style.fill=boxStyle.color;",
-      "          t.style.fontFamily=boxStyle.fontFamily;",
-      "          t.style.fontSize=String(boxStyle.fontSize)+'px';",
-      "          if(boxStyle.fontWeight) t.style.fontWeight=boxStyle.fontWeight;",
-      "          if(boxStyle.italic) t.style.fontStyle='italic';",
-      "          if(boxStyle.letterSpacing!=null) t.style.letterSpacing=String(boxStyle.letterSpacing)+'px';",
-      "          if(Math.abs(angle)>0.01){ t.setAttribute('transform','rotate('+angle+' '+x+' '+y+')'); }",
-      "          self.textLayer.appendChild(t);",
-      "        }",
-      "      }",
-      "    }",
-      "  };",
-      "",
-      "  PublishMap.prototype.renderCanvas=function(){",
-      "    if(this.cfg.renderMode!=='canvas') return;",
-      "    if(!this.baseCanvas || !this.baseCtx || !this.baseImg) return;",
-      "    var r=this.viewportEl.getBoundingClientRect();",
-      "    this.vw=r.width||1; this.vh=r.height||1;",
-      "    var dpr=Math.max(1, window.devicePixelRatio||1);",
-      "    var w=Math.max(1, Math.round(this.vw*dpr));",
-      "    var h=Math.max(1, Math.round(this.vh*dpr));",
-      "    if(this.baseCanvas.width!==w || this.baseCanvas.height!==h){",
-      "      this.baseCanvas.width=w; this.baseCanvas.height=h;",
-      "      this.baseCanvas.style.width=this.vw+'px';",
-      "      this.baseCanvas.style.height=this.vh+'px';",
-      "    }",
-      "    var ctx=this.baseCtx;",
-      "    ctx.setTransform(dpr,0,0,dpr,0,0);",
-      "    ctx.clearRect(0,0,this.vw,this.vh);",
-      "    ctx.translate(this.tx,this.ty);",
-      "    ctx.scale(this.scale,this.scale);",
-      "    ctx.imageSmoothingEnabled=true;",
-      "    ctx.drawImage(this.baseImg,0,0);",
-      "    var arr=this.getOverlaysNormalized();",
-      "    for(var i=0;i<arr.length;i++){",
-      "      var o=arr[i];",
-      "      if(!o || o.visible===false) continue;",
-      "      var u=resolveAssetUrl(o.path||'', false);",
-      "      var img=this.ensureCanvasImage(u);",
-      "      if(img && img.complete && img.naturalWidth>0) ctx.drawImage(img,0,0);",
-      "    }",
-      "    var textRaster=this.getTextLayerRasterOverlayPath();",
-      "    if(textRaster){",
-      "      var u2=resolveAssetUrl(textRaster, false);",
-      "      var img2=this.ensureCanvasImage(u2);",
-      "      if(img2 && img2.complete && img2.naturalWidth>0) ctx.drawImage(img2,0,0);",
-      "    }",
-      "    // Hide DOM base/overlays in canvas mode",
-      "    this.imgEl.style.display='none';",
-      "    this.overlaysEl.style.display='none';",
-      "  };",
-      "",
-      "  // ===== Measure tool (read-only, uses stored calibration if present) =====",
-      "  PublishMap.prototype.toggleMeasure=function(){",
-      "    this.measuring=!this.measuring;",
-      "    if(!this.measuring) this.measurePreview=null;",
-      "    this.updateMeasureHud();",
-      "    this.renderMeasure();",
-      "  };",
-      "  PublishMap.prototype.clientToWorldNorm=function(clientX,clientY){",
-      "    var r=this.viewportEl.getBoundingClientRect();",
-      "    var vx=clientX-r.left, vy=clientY-r.top;",
-      "    var wx=(vx-this.tx)/this.scale, wy=(vy-this.ty)/this.scale;",
-      "    return { x: clamp(wx/this.imgW,0,1), y: clamp(wy/this.imgH,0,1) };",
-      "  };",
-      "  PublishMap.prototype.addMeasurePointFromEvent=function(e){",
-      "    this.measurePts.push(this.clientToWorldNorm(e.clientX,e.clientY));",
-      "    this.renderMeasure();",
-      "  };",
-      "  PublishMap.prototype.updateMeasurePreviewFromEvent=function(e){",
-      "    this.measurePreview=this.clientToWorldNorm(e.clientX,e.clientY);",
-      "    this.renderMeasure();",
-      "  };",
-      "  PublishMap.prototype.clearMeasure=function(){ this.measurePts=[]; this.measurePreview=null; this.renderMeasure(); };",
-      "  PublishMap.prototype.removeLastMeasurePoint=function(){ if(this.measurePts.length) this.measurePts.pop(); this.renderMeasure(); };",
-      "  PublishMap.prototype.getMetersPerPixel=function(){",
-      "    var m=this.data && this.data.measurement ? this.data.measurement : null;",
-      "    if(!m) return null;",
-      "    var base=this.getActiveBasePath();",
-      "    if(m.scales && isNum(m.scales[base])) return m.scales[base];",
-      "    if(isNum(m.metersPerPixel)) return m.metersPerPixel;",
-      "    return null;",
-      "  };",
-      "  PublishMap.prototype.getEnabledTravelPack=function(){",
-      "    var packs = (this.library && Array.isArray(this.library.travelRulesPacks)) ? this.library.travelRulesPacks : [];",
-      "    for(var i=0;i<packs.length;i++){ if(packs[i] && packs[i].enabled===true) return packs[i]; }",
-      "    return packs[0] || null;",
-      "  };",
-      "  PublishMap.prototype.getActiveCustomUnits=function(){",
-      "    var p=this.getEnabledTravelPack();",
-      "    return (p && Array.isArray(p.customUnits)) ? p.customUnits : [];",
-      "  };",
-      "  PublishMap.prototype.getActiveTravelTimePresets=function(){",
-      "    var p=this.getEnabledTravelPack();",
-      "    return (p && Array.isArray(p.travelTimePresets)) ? p.travelTimePresets : [];",
-      "  };",
-      "  PublishMap.prototype.getActiveTravelPerDayPresets=function(){",
-      "    var p=this.getEnabledTravelPack();",
-      "    // prefer new field travelPerDayPresets; fallback to legacy travelPerDay",
-      "    if(p && Array.isArray(p.travelPerDayPresets) && p.travelPerDayPresets.length) return p.travelPerDayPresets;",
-      "    if(p && p.travelPerDay && isNum(p.travelPerDay.value) && typeof p.travelPerDay.unit==='string'){",
-      "      return [{ id:'legacy', name:'Default', value:p.travelPerDay.value, unit:p.travelPerDay.unit }];",
-      "    }",
-      "    return [];",
-      "  };",
-      "  PublishMap.prototype.getCustomPxPerUnit=function(customUnitId){",
-      "    var meas = (this.data && this.data.measurement) ? this.data.measurement : null;",
-      "    if(!meas || !meas.customUnitPxPerUnit) return null;",
-      "    var base=this.getActiveBasePath();",
-      "    var perBase = meas.customUnitPxPerUnit[base];",
-      "    if(perBase && isNum(perBase[customUnitId]) && perBase[customUnitId]>0) return perBase[customUnitId];",
-      "    return null;",
-      "  };",
-      "  PublishMap.prototype.getEffectivePxPerCustomUnit=function(customUnitId){",
-      "    var direct=this.getCustomPxPerUnit(customUnitId);",
-      "    if(direct) return direct;",
-      "    // fallback: if we have mpp + metersPerUnit, derive px/unit = metersPerUnit / mpp",
-      "    var mpp=this.getMetersPerPixel();",
-      "    if(!mpp) return null;",
-      "    var defs=this.getActiveCustomUnits();",
-      "    for(var i=0;i<defs.length;i++){",
-      "      var d=defs[i];",
-      "      if(d && d.id===customUnitId && isNum(d.metersPerUnit) && d.metersPerUnit>0){",
-      "        return d.metersPerUnit / mpp;",
-      "      }",
-      "    }",
-      "    return null;",
-      "  };",
-      "  PublishMap.prototype.formatCustomDistanceFromPixels=function(px){",
-      "    var meas = (this.data && this.data.measurement) ? this.data.measurement : null;",
-      "    var defs=this.getActiveCustomUnits();",
-      "    if(!meas || !defs.length) return Math.round(px)+' px';",
-      "    var id = meas.customUnitId || defs[0].id;",
-      "    var def=null;",
-      "    for(var i=0;i<defs.length;i++){ if(defs[i] && defs[i].id===id){ def=defs[i]; break; } }",
-      "    def = def || defs[0];",
-      "    var pxPerUnit=this.getEffectivePxPerCustomUnit(def.id);",
-      "    var label=(def.abbreviation||def.name||'u').trim() || 'u';",
-      "    if(!pxPerUnit) return 'No calibration ('+label+')';",
-      "    var val=px/pxPerUnit;",
-      "    var rounded=Math.round(val*100)/100;",
-      "    return rounded+' '+label;",
-      "  };",
-      "  PublishMap.prototype.formatDistance=function(meters){",
-      "    var meas=this.data && this.data.measurement ? this.data.measurement : null;",
-      "    var unit=meas && meas.displayUnit ? String(meas.displayUnit) : 'km';",
-      "    function round(v,d){ var p=Math.pow(10,d); return Math.round(v*p)/p; }",
-      "    if(unit==='custom'){",
-      "      // For travel: custom display is driven by px calibration, not meters. Keep a sane fallback.",
-      "      return round(meters/1000,3)+' km';",
-      "    }",
-      "    if(unit==='m') return Math.round(meters)+' m';",
-      "    if(unit==='mi') return round(meters/1609.344,3)+' mi';",
-      "    if(unit==='ft') return Math.round(meters/0.3048)+' ft';",
-      "    return round(meters/1000,3)+' km';",
-      "  };",
-      "  PublishMap.prototype.formatPolylineDistance=function(px){",
-      "    var meas=this.data && this.data.measurement ? this.data.measurement : null;",
-      "    var unit=meas && meas.displayUnit ? String(meas.displayUnit) : 'km';",
-      "    if(unit==='custom') return this.formatCustomDistanceFromPixels(px);",
-      "    var mpp=this.getMetersPerPixel();",
-      "    if(!mpp) return null;",
-      "    return this.formatDistance(px*mpp);",
-      "  };",
-      "  PublishMap.prototype.computeTravelTimeLines=function(distanceMeters){",
-      "    var meas=this.data && this.data.measurement ? this.data.measurement : null;",
-      "    if(!meas) return [];",
-      "    var selected = Array.isArray(meas.travelTimePresetIds) ? meas.travelTimePresetIds : [];",
-      "    if(!selected.length) return [];",
-      "    var presets=this.getActiveTravelTimePresets();",
-      "    var out=[];",
-      "    // per-day",
-      "    var perDayPresets=this.getActiveTravelPerDayPresets();",
-      "    var perDaySelId = (typeof meas.travelDayPresetId==='string') ? meas.travelDayPresetId.trim() : '';",
-      "    var perDay = null;",
-      "    if(perDaySelId){ for(var i=0;i<perDayPresets.length;i++){ if(perDayPresets[i].id===perDaySelId){ perDay=perDayPresets[i]; break; } } }",
-      "    perDay = perDay || perDayPresets[0] || null;",
-      "    var showDays = meas.travelDaysEnabled===true;",
-      "",
-      "    function travelDistanceToMeters(value, unit, customId, self){",
-      "      if(!isNum(value) || value<=0) return null;",
-      "      if(unit==='km') return value*1000;",
-      "      if(unit==='mi') return value*1609.344;",
-      "      if(unit==='ft') return value*0.3048;",
-      "      if(unit==='m') return value;",
-      "      if(unit==='custom'){",
-      "        if(!customId) return null;",
-      "        var pxPerUnit=self.getEffectivePxPerCustomUnit(customId);",
-      "        var mpp=self.getMetersPerPixel();",
-      "        if(!pxPerUnit || !mpp) return null;",
-      "        return value*(pxPerUnit*mpp);",
-      "      }",
-      "      return null;",
-      "    }",
-      "    function fmtNum(v){",
-      "      var a=Math.abs(v);",
-      "      var d=(a<10)?2:(a<100)?1:0;",
-      "      var p=Math.pow(10,d);",
-      "      return String(Math.round(v*p)/p);",
-      "    }",
-      "",
-      "    for(var p=0;p<presets.length;p++){",
-      "      var pr=presets[p];",
-      "      if(!pr || !pr.id) continue;",
-      "      if(selected.indexOf(pr.id)<0) continue;",
-      "      var ref=travelDistanceToMeters(pr.distanceValue, pr.distanceUnit, pr.distanceCustomUnitId, this);",
-      "      if(!ref || !isNum(pr.timeValue) || pr.timeValue<=0 || !pr.timeUnit) continue;",
-      "      var t=(distanceMeters/ref)*pr.timeValue;",
-      "      out.push('Time ('+(pr.name||pr.id)+'): '+fmtNum(t)+' '+pr.timeUnit);",
-      "",
-      "      if(!showDays) continue;",
-      "      if(!perDay || !isNum(perDay.value) || perDay.value<=0 || !perDay.unit){",
-      "        out.push('Travel days: not configured');",
-      "        continue;",
-      "      }",
-      "      var u1=String(pr.timeUnit||'').trim().toLowerCase();",
-      "      var u2=String(perDay.unit||'').trim().toLowerCase();",
-      "      if(u1!==u2){",
-      "        out.push('Travel days: unit mismatch (preset: '+pr.timeUnit+', max: '+perDay.unit+')');",
-      "        continue;",
-      "      }",
-      "      var full=Math.floor(t/perDay.value);",
-      "      var rest=t-full*perDay.value;",
-      "      var label=perDay.name ? ' ('+perDay.name+')' : '';",
-      "      if(Math.abs(rest) < 1e-6) out.push('Travel days'+label+' ('+perDay.value+' '+perDay.unit+'/day): '+full+'d');",
-      "      else if(full<=0) out.push('Travel days'+label+' ('+perDay.value+' '+perDay.unit+'/day): 0d + '+fmtNum(rest)+' '+pr.timeUnit);",
-      "      else out.push('Travel days'+label+' ('+perDay.value+' '+perDay.unit+'/day): '+full+'d + '+fmtNum(rest)+' '+pr.timeUnit);",
-      "    }",
-      "    return out;",
-      "  };",
-      "  PublishMap.prototype.computeMeasurePixels=function(includePreview){",
-      "    var pts=this.measurePts.slice();",
-      "    if(includePreview && this.measurePreview && pts.length>=1) pts.push(this.measurePreview);",
-      "    if(pts.length<2) return null;",
-      "    var px=0;",
-      "    for(var i=1;i<pts.length;i++){",
-      "      var a=pts[i-1], b=pts[i];",
-      "      var dx=(b.x-a.x)*this.imgW, dy=(b.y-a.y)*this.imgH;",
-      "      px += Math.sqrt(dx*dx+dy*dy);",
-      "    }",
-      "    return px;",
-      "  };",
-      "  PublishMap.prototype.updateMeasureHud=function(){",
-      "    var ptsCount=this.measurePts.length + ((this.measuring && this.measurePreview)?1:0);",
-      "    if(this.measuring || ptsCount>=2){",
-      "      var px=this.computeMeasurePixels(true);",
-      "      var mpp=this.getMetersPerPixel();",
-      "      var meas=this.data && this.data.measurement ? this.data.measurement : null;",
-      "      var unit=meas && meas.displayUnit ? String(meas.displayUnit) : 'km';",
-      "      var lines=[];",
-      "      if(px==null){",
-      "        lines.push('Distance: (none)');",
-      "      }else if(unit==='custom'){",
-      "        lines.push('Distance: '+this.formatCustomDistanceFromPixels(px));",
-      "      }else if(!mpp){",
-      "        lines.push('Distance: '+Math.round(px)+' px');",
-      "      }else{",
-      "        lines.push('Distance: '+this.formatDistance(px*mpp));",
-      "      }",
-      "      // Travel time requires meters",
-      "      if(px!=null && mpp){",
-      "        var tt=this.computeTravelTimeLines(px*mpp);",
-      "        for(var i=0;i<tt.length;i++) lines.push(tt[i]);",
-      "      }",
-      "      this.measureHud.textContent=lines.join('\\n');",
-      "      this.measureHud.classList.add('zm-measure-hud-visible');",
-      "    }else{",
-      "      this.measureHud.classList.remove('zm-measure-hud-visible');",
-      "    }",
-      "  };",
-      "  PublishMap.prototype.renderMeasure=function(){",
-      "    this.measureSvg.setAttribute('width', String(this.imgW));",
-      "    this.measureSvg.setAttribute('height', String(this.imgH));",
-      "    var pts=this.measurePts.slice();",
-      "    if(this.measuring && this.measurePreview) pts.push(this.measurePreview);",
-      "    var d='';",
-      "    for(var i=0;i<pts.length;i++){",
-      "      var p=pts[i];",
-      "      var ax=p.x*this.imgW, ay=p.y*this.imgH;",
-      "      d += (i===0?'M ':' L ') + ax + ' ' + ay;",
-      "    }",
-      "    this.measurePath.setAttribute('d', d);",
-      "    while(this.measureDots.firstChild) this.measureDots.removeChild(this.measureDots.firstChild);",
-      "    for(var j=0;j<this.measurePts.length;j++){",
-      "      var q=this.measurePts[j];",
-      "      var c=document.createElementNS('http://www.w3.org/2000/svg','circle');",
-      "      c.setAttribute('cx', String(q.x*this.imgW));",
-      "      c.setAttribute('cy', String(q.y*this.imgH));",
-      "      c.setAttribute('r','4');",
-      "      c.classList.add('zm-measure__dot');",
-      "      this.measureDots.appendChild(c);",
-      "    }",
-      "    this.updateMeasureHud();",
-      "  };",
-      "",
-      "  // ===== Context menu =====",
-      "  PublishMap.prototype.openContextMenu=function(clientX,clientY){",
-      "    var self=this;",
-      "    self.closeMenu();",
-      "    var items=[];",
-      "",
-      "    // Image layers: bases + overlays",
-      "    var bases=self.getBasesNormalized();",
-      "    var baseItems=bases.map(function(b){",
-      "      var label=(b.name&&String(b.name).trim()) ? b.name : (String(b.path).split('/').pop()||b.path);",
-      "      return { label: label, checked: (self.getActiveBasePath()===b.path), action: function(){ self.setActiveBase(b.path); } };",
-      "    });",
-      "    var overlays=self.getOverlaysNormalized();",
-      "    var overlayItems=overlays.map(function(o, idx){",
-      "      var label=(o.name&&String(o.name).trim()) ? o.name : (String(o.path).split('/').pop()||o.path);",
-      "      return { label: label, checked: (o.visible===true), action: function(){",
-      "        // Toggle in-memory only. If overlays came from markers data, update that object too.",
-      "        o.visible = !(o.visible===true);",
-      "        if(self.data && Array.isArray(self.data.overlays)){",
-      "          for(var i=0;i<self.data.overlays.length;i++){",
-      "            if(self.data.overlays[i] && self.data.overlays[i].path===o.path){ self.data.overlays[i].visible=o.visible; }",
-      "          }",
-      "        }",
-      "        self.renderOverlays(); self.renderCanvas();",
-      "      } };",
-      "    });",
-      "    items.push({ label: 'Image layers', children: [",
-      "      { label: 'Base', children: baseItems },",
-      "      { label: 'Overlays', children: overlayItems }",
-      "    ]});",
-      "",
-      "    var layers = (self.data && Array.isArray(self.data.layers)) ? self.data.layers : [];",
-      "    var layerItems = layers.filter(function(l){ return !isHiddenLayerName(l && l.name ? l.name : ''); }).map(function(l){",
-      "      return { label: (l.name||l.id), checked: (l.visible!==false), action: function(){ l.visible = !(l.visible!==false); self.renderMarkers(); } };",
-      "    });",
-      "    items.push({ label: 'Marker layers', children: layerItems });",
-      "",
-      "    var drawLayers = (self.data && Array.isArray(self.data.drawLayers)) ? self.data.drawLayers : [];",
-      "    if(drawLayers.length){",
-      "      var activeBase=self.getActiveBasePath();",
-      "      var drawLayerItems = drawLayers.filter(function(dl){",
-      "        if(!dl) return false;",
-      "        if(!dl.boundBase || !String(dl.boundBase).trim()) return true;",
-      "        return String(dl.boundBase).trim()===String(activeBase||'').trim();",
-      "      }).map(function(dl){",
-      "        return { label: (dl.name||dl.id), checked: (dl.visible===true), action: function(){ dl.visible = !(dl.visible===true); self.renderDrawings(); } };",
-      "      });",
-      "      items.push({ label: 'Draw layers', children: drawLayerItems });",
-      "    }",
-      "",
-      "    // Measure menu: unit + travel preset toggles (in-memory only)",
-      "    var meas = self.data && self.data.measurement ? self.data.measurement : (self.data.measurement = { displayUnit:'km', scales:{}, travelTimePresetIds:[] });",
-      "    if(!Array.isArray(meas.travelTimePresetIds)) meas.travelTimePresetIds=[];",
-      "    var unitItems=[",
-      "      { label:'m', checked:(meas.displayUnit==='m'), action:function(){ meas.displayUnit='m'; meas.customUnitId=''; self.updateMeasureHud(); } },",
-      "      { label:'km', checked:(meas.displayUnit==='km'), action:function(){ meas.displayUnit='km'; meas.customUnitId=''; self.updateMeasureHud(); } },",
-      "      { label:'mi', checked:(meas.displayUnit==='mi'), action:function(){ meas.displayUnit='mi'; meas.customUnitId=''; self.updateMeasureHud(); } },",
-      "      { label:'ft', checked:(meas.displayUnit==='ft'), action:function(){ meas.displayUnit='ft'; meas.customUnitId=''; self.updateMeasureHud(); } }",
-      "    ];",
-      "    var cus=self.getActiveCustomUnits();",
-      "    if(cus && cus.length){",
-      "      unitItems.push({ type:'separator' });",
-      "      for(var cu=0;cu<cus.length;cu++){",
-      "        (function(def){",
-      "          var label=(def.abbreviation? (def.name+' ('+def.abbreviation+')') : def.name) || def.id;",
-      "          unitItems.push({ label: label, checked:(meas.displayUnit==='custom' && meas.customUnitId===def.id), action:function(){ meas.displayUnit='custom'; meas.customUnitId=def.id; self.updateMeasureHud(); } });",
-      "        })(cus[cu]);",
-      "      }",
-      "    }",
-      "",
-      "    var travelPresets=self.getActiveTravelTimePresets();",
-      "    var travelItems=[];",
-      "    for(var tp=0;tp<travelPresets.length;tp++){",
-      "      (function(p){",
-      "        var checked=(meas.travelTimePresetIds.indexOf(p.id)>=0);",
-      "        travelItems.push({ label:(p.name||p.id), checked:checked, action:function(){",
-      "          var i=meas.travelTimePresetIds.indexOf(p.id);",
-      "          if(i>=0) meas.travelTimePresetIds.splice(i,1); else meas.travelTimePresetIds.push(p.id);",
-      "          self.updateMeasureHud();",
-      "        }});",
-      "      })(travelPresets[tp]);",
-      "    }",
-      "    if(travelItems.length){",
-      "      travelItems.push({ type:'separator' });",
-      "      travelItems.push({ label:'Show travel days', checked:(meas.travelDaysEnabled===true), action:function(){ meas.travelDaysEnabled = !(meas.travelDaysEnabled===true); self.updateMeasureHud(); } });",
-      "    }",
-      "",
-      "    items.push({ label: 'Measure', children: [",
-      "      { label: (self.measuring?'Stop measuring':'Start measuring'), action: function(){ self.toggleMeasure(); } },",
-      "      { label: 'Clear measurement', action: function(){ self.clearMeasure(); } },",
-      "      { label: 'Remove last point', action: function(){ self.removeLastMeasurePoint(); } },",
-      "      { type:'separator' },",
-      "      { label: 'Unit', children: unitItems },",
-      "      (travelItems.length ? { label:'Travel time', children: travelItems } : null)",
-      "    ].filter(Boolean)});",
-      "    items.push({ type:'separator' });",
-      "    items.push({ label:'Fit to window', action:function(){ self.fitToView(); self.renderMarkers(); self.renderCanvas(); } });",
-      "    items.push({ label:'Zoom +', action:function(){ self.zoomAt(clientX,clientY,1.2); } });",
-      "    items.push({ label:'Zoom -', action:function(){ self.zoomAt(clientX,clientY,1/1.2); } });",
-      "    self.menu = new Menu(document);",
-      "    self.menu.open(clientX,clientY,items);",
-      "  };",
-      "  PublishMap.prototype.closeMenu=function(){ if(this.menu){ this.menu.destroy(); this.menu=null; } };",
-      "",
-      "  function Menu(doc){ this.doc=doc; this.root=doc.body.appendChild(doc.createElement('div')); this.root.className='zm-menu'; this.submenus=[]; }",
-      "  Menu.prototype.open=function(x,y,items){ this.buildList(this.root,items); this.position(this.root,x,y,'right'); };",
-      "  Menu.prototype.destroy=function(){ for(var i=0;i<this.submenus.length;i++) this.submenus[i].remove(); this.submenus=[]; this.root.remove(); };",
-      "  Menu.prototype.contains=function(node){ if(this.root.contains(node)) return true; for(var i=0;i<this.submenus.length;i++) if(this.submenus[i].contains(node)) return true; return false; };",
-      "  Menu.prototype.buildList=function(container,items){",
-      "    container.innerHTML='';",
-      "    var self=this;",
-      "    items.forEach(function(it){",
-      "      if(it && it.type==='separator'){ var sep=container.appendChild(self.doc.createElement('div')); sep.className='zm-menu__sep'; return; }",
-      "      if(!it || !it.label) return;",
-      "      var row=container.appendChild(self.doc.createElement('div')); row.className='zm-menu__item';",
-      "      var label=row.appendChild(self.doc.createElement('div')); label.className='zm-menu__label'; label.textContent=it.label;",
-      "      var right=row.appendChild(self.doc.createElement('div')); right.className='zm-menu__right';",
-      "      if(it.children && it.children.length){",
-      "        var arrow=right.appendChild(self.doc.createElement('div')); arrow.className='zm-menu__arrow'; arrow.textContent='\u25B6';",
-      "        var submenu=null;",
-      "        var openSub=function(){",
-      "          if(submenu) return;",
-      "          submenu=self.doc.body.appendChild(self.doc.createElement('div')); submenu.className='zm-submenu'; self.submenus.push(submenu);",
-      "          self.buildList(submenu,it.children);",
-      "          var r=row.getBoundingClientRect();",
-      "          var pref=(r.right+280<window.innerWidth)?'right':'left';",
-      "          var sx=(pref==='right')?r.right:r.left;",
-      "          self.position(submenu,sx,r.top,pref);",
-      "        };",
-      "        var closeSub=function(ev){ if(!submenu) return; var to=ev && ev.relatedTarget; if(to && submenu.contains(to)) return; submenu.remove(); self.submenus=self.submenus.filter(function(s){return s!==submenu;}); submenu=null; };",
-      "        row.addEventListener('mouseenter', openSub);",
-      "        row.addEventListener('mouseleave', closeSub);",
-      "      }else{",
-      "        var chk=right.appendChild(self.doc.createElement('div')); chk.className='zm-menu__check'; chk.textContent = it.checked ? '\u2713' : '';",
-      "        row.addEventListener('click', function(){ if(typeof it.action==='function') it.action(row,self); });",
-      "      }",
-      "    });",
-      "  };",
-      "  Menu.prototype.position=function(el,x,y,prefer){",
-      "    var pad=6; var rect=el.getBoundingClientRect(); var vw=window.innerWidth, vh=window.innerHeight;",
-      "    var px=x, py=y;",
-      "    if(prefer==='right'){ if(px+rect.width+pad>vw) px=Math.max(pad, vw-rect.width-pad); }",
-      "    else { px=x-rect.width; if(px<pad) px=pad; }",
-      "    if(py+rect.height+pad>vh) py=Math.max(pad, vh-rect.height-pad);",
-      "    el.style.left=Math.round(px)+'px'; el.style.top=Math.round(py)+'px';",
-      "  };",
-      "",
-      "  function initOne(codeEl){",
-      "    var pre = codeEl && codeEl.closest ? codeEl.closest('pre') : null;",
-      "    if(!pre || STATE.inited.has(pre)) return;",
-      "    STATE.inited.add(pre);",
-      "    var cfg=parseZoommapYaml(codeEl.textContent||'');",
-      "    if(!cfg || !cfg.imagePath) return;",
-      "    var host=document.createElement('div'); host.className='zm-root';",
-      "    pre.replaceWith(host);",
-      "    ensureLibrary().then(function(lib){",
-      "      return fetchNoteJson(cfg.markersNote).then(function(data){",
-      "        var map=new PublishMap(host,cfg,data,lib);",
-      "        return map.init();",
-      "      });",
-      "    }).catch(function(err){",
-      "      console.warn('ZoomMap Publish: init failed', err);",
-      "      host.textContent='ZoomMap Publish: failed to load map data.';",
-      "    });",
-      "  }",
-      "",
-      "  function findZoommapBlocks(){",
-      "    var nodes=document.querySelectorAll('pre > code');",
-      "    var out=[];",
-      "    for(var i=0;i<nodes.length;i++){",
-      "      var c=nodes[i];",
-      "      var cls=(c.className||'');",
-      "      if(cls.indexOf('language-zoommap')>=0 || cls.indexOf('lang-zoommap')>=0) out.push(c);",
-      "    }",
-      "    return out;",
-      "  }",
-      "",
-      "  function findTimelineBlocks(){",
-      "    var nodes=document.querySelectorAll('pre > code');",
-      "    var out=[];",
-      "    for(var i=0;i<nodes.length;i++){",
-      "      var c=nodes[i];",
-      "      var cls=(c.className||'');",
-      "      var isCal = (cls.indexOf('language-timeline-cal')>=0 || cls.indexOf('lang-timeline-cal')>=0);",
-      "      var isH = (cls.indexOf('language-timeline-h')>=0 || cls.indexOf('lang-timeline-h')>=0);",
-      "      if(isCal || isH) out.push({ code: c, kind: (isH ? 'h' : 'cal') });",
-      "    }",
-      "    return out;",
-      "  }",
-      "",
-      "  function parseTimelineYaml(raw){",
-      "    var lines = String(raw||'').split('\\n').map(function(ln){ return stripQuotePrefix(ln); });",
-      "    // very small YAML subset: scalars + list blocks",
-      "    var scalars = {};",
-      "    var blocks = {};",
-      "    var i=0;",
-      "    function isTopKey(ln){",
-      "      if(!ln) return false;",
-      "      if(/^\\s+#/.test(ln)) return false;",
-      "      return /^([A-Za-z0-9_-]+)\\s*:\\s*(.*)$/.test(ln) && (/^\\S/.test(ln));",
-      "    }",
-      "    while(i<lines.length){",
-      "      var ln=lines[i];",
-      "      if(!ln.trim() || ln.trim().startsWith('#')){ i++; continue; }",
-      "      var m=/^([A-Za-z0-9_-]+)\\s*:\\s*(.*)$/.exec(ln);",
-      "      if(!m){ i++; continue; }",
-      "      var key=m[1];",
-      "      var rest=(m[2]||'').trim();",
-      "      i++;",
-      "      if(rest){ scalars[key]=rest; continue; }",
-      "      var block=[];",
-      "      while(i<lines.length){",
-      "        var nx=lines[i];",
-      "        if(isTopKey(nx)) break;",
-      "        block.push(nx);",
-      "        i++;",
-      "      }",
-      "      blocks[key]=block;",
-      "    }",
-      "",
-      "    function parseListBlock(block){",
-      "      var out=[];",
-      "      if(!block) return out;",
-      "      for(var j=0;j<block.length;j++){",
-      "        var ln=block[j];",
-      "        if(!ln || !ln.trim() || ln.trim().startsWith('#')) continue;",
-      "        var t=ln.trim();",
-      "        if(t.startsWith('-')){",
-      "          var v=t.slice(1).trim();",
-      "          if(v) out.push(stripQuotes(v));",
-      "        }",
-      "      }",
-      "      return out;",
-      "    }",
-      "",
-      "    function splitNames(s){",
-      `      var cleaned = String(s||'').replace(/[\\[\\]"]/g,'');`,
-      "      return cleaned.split(/[,;\\n]+/g).map(function(x){return x.trim();}).filter(Boolean);",
-      "    }",
-      "",
-      "    var names=[];",
-      "    if(scalars.names) names = splitNames(scalars.names);",
-      "    else if(scalars.name) names = splitNames(scalars.name);",
-      "    else if(blocks.names) names = parseListBlock(blocks.names);",
-      "",
-      "    var mode = String(scalars.mode||'mixed').trim().toLowerCase();",
-      "    if(mode!=='stacked' && mode!=='mixed') mode='mixed';",
-      "",
-      "    var align = String(scalars.align||'left').trim().toLowerCase();",
-      "    if(align!=='right' && align!=='left') align='left';",
-      "",
-      "    var maxSummaryLines = parseInt(String(scalars.maxSummaryLines||scalars.summaryLines||'6'), 10);",
-      "    if(!isFinite(maxSummaryLines) || maxSummaryLines<1) maxSummaryLines=6;",
-      "",
-      "    var dedupeRaw = String(scalars.dedupe||'false').trim().toLowerCase();",
-      "    var dedupe = (dedupeRaw==='true');",
-      "",
-      "    var cardWidth = parseInt(String(scalars.cardWidth||'200'), 10);",
-      "    if(!isFinite(cardWidth) || cardWidth<80) cardWidth=200;",
-      "",
-      "    var cardHeight = parseInt(String(scalars.cardHeight||'315'), 10);",
-      "    if(!isFinite(cardHeight) || cardHeight<80) cardHeight=315;",
-      "",
-      "    var boxHeight = parseInt(String(scalars.boxHeight||'289'), 10);",
-      "    if(!isFinite(boxHeight) || boxHeight<60) boxHeight=289;",
-      "",
-      "    return { names:names, mode:mode, align:align, maxSummaryLines:maxSummaryLines, cardWidth:cardWidth, cardHeight:cardHeight, boxHeight:boxHeight, dedupe: dedupe };",
-      "  }",
-      "",
-      "  function ymdSortKey(ymd){ return (ymd.y*10000 + ymd.m*100 + ymd.d); }",
-      "  function formatRange(start, end){",
-      "    function pad(n){return String(n);}",
-      "    function fmt(x){ return pad(x.d)+'-'+pad(x.m)+'-'+pad(x.y); }",
-      "    if(!end) return fmt(start);",
-      "    if(start.y===end.y && start.m===end.m && start.d===end.d) return fmt(start);",
-      "    if(start.y===end.y && start.m===end.m) return String(start.d)+'\u2013'+String(end.d)+'-'+pad(start.m)+'-'+pad(start.y);",
-      "    return fmt(start) + ' \u2013 ' + fmt(end);",
-      "  }",
-      "",
-      "  function normalizeInternalLinkTarget(path){",
-      "    var p=String(path||'').trim();",
-      "    if(!p) return '';",
-      "    p=stripWikiBrackets(p);",
-      "    p=p.split('#')[0].split('?')[0];",
-      "    p=p.replace(/\\\\/g,'/');",
-      "    p=p.replace(/^\\/+/, '');",
-      "    p=p.replace(/\\/{2,}/g,'/');",
-      "    p=stripMdExt(p);",
-      "    return p;",
-      "  }",
-      "",
-      "  function resolveMaybeAssetUrl(img){",
-      "    var s=String(img||'').trim();",
-      "    if(!s) return '';",
-      "    if(/^data:/.test(s) || /^https?:\\/\\//i.test(s)) return s;",
-      "    return resolveAssetUrl(s, false);",
-      "  }",
-      "",
-      "  function buildTimelineRow(entry, opts){",
-      "    var row=document.createElement('div');",
-      "    row.className='tl-row' + (opts.align==='right'?' tl-align-right':'');",
-      "",
-      "    var grid=document.createElement('div');",
-      "    grid.className='tl-grid ' + (entry.img ? 'has-media' : 'no-media');",
-      "    grid.style.setProperty('--tl-media-w', String(opts.cardWidth)+'px');",
-      "    row.appendChild(grid);",
-      "",
-      "    if(entry.img){",
-      "      var media=document.createElement('div');",
-      "      media.className='tl-media';",
-      "      media.style.width=String(opts.cardWidth)+'px';",
-      "      media.style.height=String(opts.cardHeight)+'px';",
-      "      var img=document.createElement('img');",
-      "      img.loading='lazy';",
-      "      img.alt=entry.title || '';",
-      "      img.src=resolveMaybeAssetUrl(entry.img);",
-      "      img.style.width='100%';",
-      "      img.style.height='100%';",
-      "      img.style.objectFit='cover';",
-      "      media.appendChild(img);",
-      "      grid.appendChild(media);",
-      "",
-      "      // hover anchor (image)",
-      "      var aImg=document.createElement('a');",
-      "      aImg.className='internal-link tl-hover-anchor';",
-      "      aImg.setAttribute('data-href', normalizeInternalLinkTarget(entry.notePath));",
-      "      aImg.href=resolveNoteHref(entry.notePath);",
-      "      media.appendChild(aImg);",
-      "    }",
-      "",
-      "    var box=document.createElement('div');",
-      "    box.className='tl-box' + (entry.img?' has-media':'');",
-      "    box.style.height=String(opts.boxHeight)+'px';",
-      "    grid.appendChild(box);",
-      "",
-      "    var h1=document.createElement('h1');",
-      "    h1.className='tl-title';",
-      "    h1.textContent=entry.title || '';",
-      "    box.appendChild(h1);",
-      "",
-      "    var h4=document.createElement('h4');",
-      "    h4.className='tl-date';",
-      "    // Prefer baked dateText (includes custom months from desktop settings)",
-      "    // Fallback to numeric formatting if missing.",
-      "    h4.textContent=(entry.dateText ? String(entry.dateText) : formatRange(entry.start, entry.end));",
-      "    box.appendChild(h4);",
-      "",
-      "    var sum=document.createElement('div');",
-      "    sum.className='tl-summary tl-clamp';",
-      "    sum.style.setProperty('--tl-summary-lines', String(opts.maxSummaryLines));",
-      "    sum.textContent=entry.summary || '';",
-      "    box.appendChild(sum);",
-      "",
-      "    var aBox=document.createElement('a');",
-      "    aBox.className='internal-link tl-hover-anchor';",
-      "    aBox.setAttribute('data-href', normalizeInternalLinkTarget(entry.notePath));",
-      "    aBox.href=resolveNoteHref(entry.notePath);",
-      "    box.appendChild(aBox);",
-      "",
-      "    return row;",
-      "  }",
-      "",
-      "  function renderTimelineCal(host, entries, opts){",
-      "    host.innerHTML='';",
-      "    var controls=document.createElement('div');",
-      "    controls.className='tl-controls';",
-      "    host.appendChild(controls);",
-      "",
-      "    var wrap=document.createElement('div');",
-      "    wrap.className='tl-wrapper tl-cross-mode';",
-      "    host.appendChild(wrap);",
-      "",
-      "    for(var i=0;i<entries.length;i++){",
-      "      wrap.appendChild(buildTimelineRow(entries[i], opts));",
-      "    }",
-      "  }",
-      "",
-      "  function renderTimelineH(host, groupedByName, allEntriesSorted, opts){",
-      "    host.innerHTML='';",
-      "    var controls=document.createElement('div');",
-      "    controls.className='tl-controls';",
-      "    host.appendChild(controls);",
-      "",
-      "    var scroller=document.createElement('div');",
-      "    scroller.className='tl-h-scroller';",
-      "    host.appendChild(scroller);",
-      "",
-      "    var wrapper=document.createElement('div');",
-      "    wrapper.className='tl-h-content ' + (opts.mode==='stacked' ? 'tl-h-stacked' : 'tl-h-mixed');",
-      "    scroller.appendChild(wrapper);",
-      "",
-      "    if(opts.mode!=='stacked'){",
-      "      for(var i=0;i<allEntriesSorted.length;i++){",
-      "        var row=buildTimelineRow(allEntriesSorted[i], opts);",
-      "        row.classList.add('tl-h-item');",
-      "        wrapper.appendChild(row);",
-      "      }",
-      "      return;",
-      "    }",
-      "",
-      "    // stacked: union axis of start dates",
-      "    var axisKeys=[]; var seen={};",
-      "    for(var a=0;a<allEntriesSorted.length;a++){",
-      "      var k=ymdSortKey(allEntriesSorted[a].start);",
-      "      if(!seen[k]){ seen[k]=true; axisKeys.push(k); }",
-      "    }",
-      "    axisKeys.sort(function(x,y){return x-y;});",
-      "    var colByKey={};",
-      "    for(var c=0;c<axisKeys.length;c++) colByKey[axisKeys[c]] = (c+1);",
-      "",
-      "    wrapper.style.setProperty('--tl-h-cols', String(axisKeys.length));",
-      "",
-      "    var names=Object.keys(groupedByName);",
-      "    for(var n=0;n<names.length;n++){",
-      "      var name=names[n];",
-      "      var list=groupedByName[name] || [];",
-      "",
-      "      var tlRowWrap=document.createElement('div');",
-      "      tlRowWrap.className='tl-h-timeline';",
-      "      wrapper.appendChild(tlRowWrap);",
-      "",
-      "      var rowGrid=document.createElement('div');",
-      "      rowGrid.className='tl-h-row';",
-      "      rowGrid.style.setProperty('--tl-h-cols', String(axisKeys.length));",
-      "      tlRowWrap.appendChild(rowGrid);",
-      "",
-      "      // group by date key",
-      "      var byDate={};",
-      "      for(var i2=0;i2<list.length;i2++){",
-      "        var kk=ymdSortKey(list[i2].start);",
-      "        (byDate[kk]||(byDate[kk]=[])).push(list[i2]);",
-      "      }",
-      "",
-      "      var dateKeys=Object.keys(byDate).map(function(x){return parseInt(x,10);}).filter(isFinite);",
-      "      dateKeys.sort(function(x,y){return (colByKey[x]||0)-(colByKey[y]||0);});",
-      "",
-      "      for(var d=0;d<dateKeys.length;d++){",
-      "        var dk=dateKeys[d];",
-      "        var col=colByKey[dk];",
-      "        if(!col) continue;",
-      "        var slot=document.createElement('div');",
-      "        slot.className='tl-h-slot';",
-      "        slot.style.setProperty('--tl-h-col', String(col));",
-      "        rowGrid.appendChild(slot);",
-      "        var items=byDate[dk] || [];",
-      "        for(var z=0;z<items.length;z++){",
-      "          var row2=buildTimelineRow(items[z], opts);",
-      "          row2.classList.add('tl-h-item');",
-      "          slot.appendChild(row2);",
-      "        }",
-      "      }",
-      "    }",
-      "  }",
-      "",
-      "  function dedupeEntries(list){",
-      "    var out=[];",
-      "    var seen={};",
-      "    for(var i=0;i<list.length;i++){",
-      "      var e=list[i];",
-      "      var k=String(e.notePath||'') + '|' + String(ymdSortKey(e.start));",
-      "      if(seen[k]) continue;",
-      "      seen[k]=true;",
-      "      out.push(e);",
-      "    }",
-      "    return out;",
-      "  }",
-      "",
-      "  function loadTimelineEntriesForName(name){",
-      "    var note = TL_PREFIX + hashKeyToId(name);",
-      "    return fetchNoteJson(note).then(function(obj){",
-      "      // expected: { timelineName, entries: [...] }",
-      "      if(!obj || !obj.entries || !Array.isArray(obj.entries)) return { name:name, entries:[] };",
-      "      return { name:(obj.timelineName||name), entries:obj.entries };",
-      "    }).catch(function(_e){",
-      "      return { name:name, entries:[] };",
-      "    });",
-      "  }",
-      "",
-      "  function initTimelineOne(item){",
-      "    var codeEl=item.code;",
-      "    var pre = codeEl && codeEl.closest ? codeEl.closest('pre') : null;",
-      "    if(!pre || STATE.inited.has(pre)) return;",
-      "    STATE.inited.add(pre);",
-      "",
-      "    var opts=parseTimelineYaml(codeEl.textContent||'');",
-      "    if(!opts.names || !opts.names.length){",
-      "      var err=document.createElement('div');",
-      `      err.textContent='Timeline: missing "names:" in code block.';`,
-      "      pre.replaceWith(err);",
-      "      return;",
-      "    }",
-      "",
-      "    var host=document.createElement('div');",
-      "    host.className='tl-publish-root';",
-      "    host.textContent='Loading timeline\u2026';",
-      "    pre.replaceWith(host);",
-      "",
-      "    Promise.all(opts.names.map(function(n){ return loadTimelineEntriesForName(n); }))",
-      "      .then(function(groups){",
-      "        var grouped={};",
-      "        var all=[];",
-      "        for(var i=0;i<groups.length;i++){",
-      "          var g=groups[i];",
-      "          var list = Array.isArray(g.entries) ? g.entries : [];",
-      "          for(var j=0;j<list.length;j++){",
-      "            var e=list[j];",
-      "            if(!e || !e.start) continue;",
-      "            // normalize minimal shape",
-      "            if(!e.title) e.title='';",
-      "            if(!e.summary) e.summary='';",
-      "            all.push(e);",
-      "          }",
-      "          grouped[g.name]=list;",
-      "        }",
-      "        // IMPORTANT: default is NO dedupe, because users may want entries to appear multiple times",
-      "        // when the same note is part of multiple timelines.",
-      "        if(opts.dedupe===true){",
-      "          all = dedupeEntries(all);",
-      "        }",
-      "        all.sort(function(a,b){ return ymdSortKey(a.start)-ymdSortKey(b.start); });",
-      "",
-      "        if(item.kind==='h'){",
-      "          renderTimelineH(host, grouped, all, opts);",
-      "        }else{",
-      "          renderTimelineCal(host, all, opts);",
-      "        }",
-      "      })",
-      "      .catch(function(err){",
-      "        console.warn('Timeline Publish: init failed', err);",
-      "        host.textContent='Timeline Publish: failed to load timeline data.';",
-      "      });",
-      "  }",
-      "",
-      "  function scan(){",
-      "    findZoommapBlocks().forEach(function(c){ initOne(c); });",
-      "    findTimelineBlocks().forEach(function(it){ initTimelineOne(it); });",
-      "  }",
-      "",
-      "  function applyHoverPopoverSizing(){",
-      "    // CSS should normally handle this, but Publish styles can be stubborn depending on theme/version.",
-      "    // So we also enforce sizing inline.",
-      "    var w = 'min(' + HOVER_POPOVER_MAX_WIDTH + ', 92vw)';",
-      "    var h = '92vh';",
-      "    function isHoverPopover(el){",
-      "      if(!el || !el.classList) return false;",
-      "      if(el.classList.contains('hover-popover')) return true;",
-      "      if(el.classList.contains('popover') && el.classList.contains('hover-popover')) return true;",
-      "      if(el.classList.contains('popover') && (el.querySelector('.hover-popover-content') || el.querySelector('.popover-content'))) return true;",
-      "      return false;",
-      "    }",
-      "    function applyOne(el, reschedule){",
-      "      if(!el || !el.style) return;",
-      "      try{",
-      "        el.style.setProperty('--popover-width', w, 'important');",
-      "        el.style.setProperty('width', w, 'important');",
-      "        el.style.setProperty('max-width', w, 'important');",
-      "        el.style.setProperty('max-height', h, 'important');",
-      "        el.style.setProperty('height', 'auto', 'important');",
-      "        el.style.setProperty('overflow', 'hidden', 'important');",
-      "        el.style.setProperty('display', 'flex', 'important');",
-      "        el.style.setProperty('flex-direction', 'column', 'important');",
-      "      }catch(_e){}",
-      "",
-      "      var sels = [",
-      "        '.hover-popover-content',",
-      "        '.popover-content'",
-      "      ];",
-      "      for(var s=0;s<sels.length;s++){",
-      "        var node = el.querySelector(sels[s]);",
-      "        if(!node || !node.style) continue;",
-      "        try{",
-      "          node.style.setProperty('width', '100%', 'important');",
-      "          node.style.setProperty('max-width', '100%', 'important');",
-      "          node.style.setProperty('height', 'auto', 'important');",
-      "          node.style.setProperty('max-height', '100%', 'important');",
-      "          node.style.setProperty('min-height', '0', 'important');",
-      "          node.style.setProperty('overflow', 'auto', 'important');",
-      "          node.style.setProperty('flex', '1 1 auto', 'important');",
-      "        }catch(_e2){}",
-      "      }",
-      "",
-      "      var inner = el.querySelector('.markdown-preview-view') || el.querySelector('.markdown-preview-section');",
-      "      if(inner && inner.style){",
-      "        try{",
-      "          inner.style.setProperty('width', '100%', 'important');",
-      "          inner.style.setProperty('max-width', '100%', 'important');",
-      "          inner.style.setProperty('height', 'auto', 'important');",
-      "          inner.style.setProperty('max-height', '100%', 'important');",
-      "          inner.style.setProperty('min-height', '0', 'important');",
-      "          inner.style.setProperty('overflow', 'auto', 'important');",
-      "        }catch(_e3){}",
-      "      }",
-      "",
-      "      if(reschedule) return;",
-      "      if(el.__ttrpgtoolsHoverPopSized) return;",
-      "      el.__ttrpgtoolsHoverPopSized = 1;",
-      "      var rerun = function(){ applyOne(el, true); };",
-      "      try{ requestAnimationFrame(rerun); }catch(_e4){}",
-      "      try{ setTimeout(rerun, 60); }catch(_e5){}",
-      "      try{ setTimeout(rerun, 250); }catch(_e6){}",
-      "    }",
-      "",
-      "    var nodes = document.querySelectorAll('.hover-popover, .popover');",
-      "    for(var i=0;i<nodes.length;i++){",
-      "      var el = nodes[i];",
-      "      if(!isHoverPopover(el)) continue;",
-      "      applyOne(el, false);",
-      "    }",
-      "  }",
-      "  function scanAll(){",
-      "    applyNavHiding();",
-      "    applyHoverPopoverSizing();",
-      "    scan();",
-      "  }",
-      "  function schedule(){ if(STATE.raf) return; STATE.raf=requestAnimationFrame(function(){ STATE.raf=0; scanAll(); }); }",
-      "",
-      "  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', schedule); else schedule();",
-      "  var mo=new MutationObserver(function(){ schedule(); });",
-      "  mo.observe(document.body,{childList:true,subtree:true});",
-      "",
-      "})();",
-      "",
-      ZM_END_JS,
-      ""
-    ].join("\n");
-    return js;
+  function createSvgEl(tag, parent, attrs) {
+    const e = document.createElementNS(NS, tag);
+    if (attrs) for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v);
+    parent.appendChild(e);
+    return e;
   }
-
-  // src/static-runtime.ts
-  function buildStaticJsBlock() {
-    const buildStamp = (/* @__PURE__ */ new Date()).toISOString().split("T")[0];
-    const publishJs = buildPublishJsBlock(buildStamp, {
-      mapRoot: "ZoomMap/publish",
-      timelineRoot: "Timeline/publish",
-      hideNavFolders: [],
-      hoverPopoverMaxWidth: "720px"
-    });
-    let js = publishJs;
-    js = js.replace(
-      "var SITE_BASE = (function(){",
-      "var STATIC_BASE = (function(){var scripts=document.getElementsByTagName('script');for(var i=0;i<scripts.length;i++){var src=scripts[i].src||'';if(src.indexOf('zoom-map-static')>=0||src.indexOf('ttrpg-tools')>=0){var a=document.createElement('a');a.href=src;return a.origin||(a.protocol+'//'+a.host);}}return location.origin;})();var SITE_BASE = (function(){  // DISABLED - using STATIC_BASE above"
-    );
-    js = js.replace(/var SITE_BASE\s*=\s*\(function\(\)\{[\s\S]*?\}\)\(\);/g, function(match) {
-      return match;
-    });
-    js = js.replace(
-      /var SITE_BASE\s*=\s*\(function\(\)\{[\s\S]*?\}\)\(\);/,
-      "var SITE_BASE=STATIC_BASE;"
-    );
-    js = js.replace(
-      /function getAccessBaseUrl\(\)\{[\s\S]*?\}/,
-      'function getAccessBaseUrl(){return ""}'
-    );
-    js = js.replace(
-      /function fetchNoteJson\([^)]*\)\{[\s\S]*?return fetchTextCached[\s\S]*?\n    \}/,
-      `function fetchNoteJson(t){
-  var prefetched=STATE.prefetched||(STATE.prefetched={});
-  if(prefetched[t])return Promise.resolve(prefetched[t]);
-  var el=document.getElementById('zm-nd-'+t.replace(/[^a-zA-Z0-9]/g,'-'));
-  if(el){try{var d=JSON.parse(el.textContent||'{}');prefetched[t]=d;return Promise.resolve(d);}catch(e){}}
-  var url=t.replace(/\\.md$/i,'.data.json');
-  if(!/^\\//.test(url)&&!/^https?:\\/\\//i.test(url))url='/'+url;
-  return fetch(url).then(function(r){if(!r.ok)throw new Error('Failed to load '+url);return r.json();}).then(function(d){prefetched[t]=d;return d;});
-    }`
-    );
-    js = js.replace(
-      /function ensureLibrary\(\)\{[\s\S]*?return STATE\.library[\s\S]*?\n      \}/,
-      `function ensureLibrary(){
-  if(STATE.library)return STATE.library;
-  var el=document.getElementById('zm-library-data');
-  if(el){try{STATE.library=Promise.resolve(JSON.parse(el.textContent||'{}'));}catch(e){STATE.library=Promise.resolve({});}}
-  else STATE.library=Promise.resolve({});
-  return STATE.library;
-      }`
-    );
-    js = js.replace(
-      /function resolveAssetUrl\([^)]*\)\{[\s\S]*?\n    \}/,
-      `function resolveAssetUrl(t){
-  if(/^https?:\\/\\//i.test(t)||/^data:/.test(t))return t;
-  if(/^\\//.test(t))return STATIC_BASE+t;
-  return t;
-    }`
-    );
-    js = js.replace(
-      /function resolveNoteHref\([^)]*\)\{[\s\S]*?\n    \}/,
-      `function resolveNoteHref(t){
-  if(/\\\\.md$/i.test(t))t=t.replace(/\\\\.md$/i,'.html');
-  return t;
-    }`
-    );
-    js = js.replace(
-      /function resolveUrl\([^)]*\)\{[\s\S]*?\n    \}/,
-      `function resolveUrl(t){
-  if(!t)return '';
-  if(/^https?:\\/\\//i.test(t))return t;
-  if(!/^\\//.test(t))t='/'+t;
-  return STATIC_BASE+t;
-    }`
-    );
-    js = js.replace(
-      /function applyNavHiding\(\)\{[\s\S]*?\n      \}/m,
-      "function applyNavHiding(){}"
-    );
-    js = js.replace(
-      /function applyHoverPopoverSizing\([^)]*\)\{[\s\S]*?\n      \}/m,
-      "function applyHoverPopoverSizing(){}"
-    );
-    return js;
+  function svgEl(tag, parent, attrs) {
+    const e = document.createElementNS(NS, tag);
+    if (attrs) for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v);
+    parent.appendChild(e);
+    return e;
   }
+  var StaticMap = class {
+    /* ---- lifecycle ---- */
+    constructor(container) {
+      this.markers = [];
+      this.iconMap = /* @__PURE__ */ new Map();
+      this.overlays = [];
+      this.clsPfx = "zm-st";
+      /* state */
+      this.scale = 1;
+      this.tx = 0;
+      this.ty = 0;
+      this.imgW = 800;
+      this.imgH = 600;
+      this.ready = false;
+      /* grid */
+      this.gridSvg = null;
+      this.gridStaticLayer = null;
+      /* interaction state */
+      this.dragging = false;
+      this.dragStart = { x: 0, y: 0 };
+      this.dragTx0 = 0;
+      this.dragTy0 = 0;
+      this.lastPinchDist = 0;
+      this.lastPinchScale = 1;
+      /* marker hover / popover */
+      this.activePopover = null;
+      this.activeMarkerEl = null;
+      /* ---- tooltip ---- */
+      this.tooltipEl = null;
+      this.handleResize = () => {
+        if (!this.ready) return;
+        if (this.cfg.responsive) {
+          const z = this.calcFitScale();
+          this.scale = z;
+          const vw = this.viewport.clientWidth || 1;
+          const vh = this.viewport.clientHeight || 1;
+          this.tx = vw / 2 - this.imgW / 2 * this.scale;
+          this.ty = vh / 2 - this.imgH / 2 * this.scale;
+          this.applyTransform();
+          this.renderMarkers();
+        }
+      };
+      this.onPointerDown = (e) => {
+        if (e.button !== 0) return;
+        this.dragging = true;
+        this.dragStart = this.getEventPos(e);
+        this.dragTx0 = this.tx;
+        this.dragTy0 = this.ty;
+        this.viewport.style.cursor = "grabbing";
+        this.closePopover();
+      };
+      this.onPointerMove = (e) => {
+        if (!this.dragging) return;
+        const p = this.getEventPos(e);
+        this.tx = this.dragTx0 + (p.x - this.dragStart.x);
+        this.ty = this.dragTy0 + (p.y - this.dragStart.y);
+        this.applyTransform();
+        if (this.tooltipEl) {
+          const r = this.viewport.getBoundingClientRect();
+          this.tooltipEl.style.left = `${r.left + p.x}px`;
+          this.tooltipEl.style.top = `${r.top + p.y - 30}px`;
+        }
+      };
+      this.onPointerUp = () => {
+        this.dragging = false;
+        this.viewport.style.cursor = "grab";
+      };
+      /* ---- touch ---- */
+      this.activeTouches = /* @__PURE__ */ new Map();
+      this.onTouchStart = (e) => {
+        if (e.touches.length === 1) {
+          e.preventDefault();
+          const t = e.touches[0];
+          const r = this.viewport.getBoundingClientRect();
+          const p = { x: t.clientX - r.left, y: t.clientY - r.top };
+          this.activeTouches.set(t.identifier, p);
+          this.dragging = true;
+          this.dragStart = p;
+          this.dragTx0 = this.tx;
+          this.dragTy0 = this.ty;
+        } else if (e.touches.length === 2) {
+          e.preventDefault();
+          this.dragging = false;
+          const t0 = e.touches[0];
+          const t1 = e.touches[1];
+          const dx = t1.clientX - t0.clientX;
+          const dy = t1.clientY - t0.clientY;
+          this.lastPinchDist = Math.sqrt(dx * dx + dy * dy);
+          this.lastPinchScale = this.scale;
+        }
+      };
+      this.onTouchMove = (e) => {
+        if (e.touches.length === 1 && this.dragging) {
+          e.preventDefault();
+          const t = e.touches[0];
+          const r = this.viewport.getBoundingClientRect();
+          const p = { x: t.clientX - r.left, y: t.clientY - r.top };
+          this.tx = this.dragTx0 + (p.x - this.dragStart.x);
+          this.ty = this.dragTy0 + (p.y - this.dragStart.y);
+          this.applyTransform();
+        } else if (e.touches.length === 2) {
+          e.preventDefault();
+          const t0 = e.touches[0];
+          const t1 = e.touches[1];
+          const dx = t1.clientX - t0.clientX;
+          const dy = t1.clientY - t0.clientY;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          const cx = (t0.clientX + t1.clientX) / 2;
+          const cy = (t0.clientY + t1.clientY) / 2;
+          if (this.lastPinchDist > 0) {
+            const factor = dist / this.lastPinchDist;
+            this.zoomAt(
+              factor,
+              cx - this.viewport.getBoundingClientRect().left,
+              cy - this.viewport.getBoundingClientRect().top
+            );
+            this.lastPinchDist = dist;
+            this.lastPinchScale = this.scale;
+          }
+        }
+      };
+      this.onTouchEnd = (e) => {
+        if (e.touches.length === 0) {
+          this.dragging = false;
+          this.activeTouches.clear();
+        }
+      };
+      /* ---- wheel / dblclick ---- */
+      this.onWheel = (e) => {
+        e.preventDefault();
+        const r = this.viewport.getBoundingClientRect();
+        const factor = e.deltaY < 0 ? 1.08 : 1 / 1.08;
+        this.zoomAt(factor, e.clientX - r.left, e.clientY - r.top);
+      };
+      this.onDblClick = (e) => {
+        const r = this.viewport.getBoundingClientRect();
+        this.zoomAt(1.5, e.clientX - r.left, e.clientY - r.top);
+      };
+      var _a;
+      this.container = container;
+      container.classList.add("zm-static-root");
+      this.cfg = this.loadConfig(container);
+      this.markers = this.loadMarkers(container);
+      this.imgW = this.cfg.imgW || 800;
+      this.imgH = this.cfg.imgH || 600;
+      for (const ip of this.cfg.iconProfiles) this.iconMap.set(ip.key, ip);
+      this.overlays = (_a = this.cfg.overlays) != null ? _a : [];
+      this.buildDom();
+      this.attachEvents();
+      void this.loadBaseImage().then(() => {
+        this.ready = true;
+        this.applyInitialView();
+        this.renderMarkers();
+        this.renderOverlays();
+        this.renderGrid();
+      });
+      this.handleResize();
+    }
+    destroy() {
+      this.closePopover();
+    }
+    /* ---- config loading ---- */
+    loadConfig(container) {
+      const dataCfg = container.getAttribute("data-zm-config");
+      if (dataCfg) {
+        try {
+          return JSON.parse(dataCfg);
+        } catch (e) {
+        }
+      }
+      const script = container.querySelector("script.zm-config-json");
+      if (script == null ? void 0 : script.textContent) {
+        try {
+          return JSON.parse(script.textContent);
+        } catch (e) {
+        }
+      }
+      return this.loadConfigFromAttrs(container);
+    }
+    loadConfigFromAttrs(container) {
+      var _a, _b, _c, _d, _e, _f, _g, _h, _i;
+      const get = (key) => container.getAttribute(`data-zm-${key}`);
+      const imageUrl = (_a = get("imageurl")) != null ? _a : "";
+      const markersUrl = (_b = get("markersurl")) != null ? _b : void 0;
+      const iconProfilesRaw = get("icons");
+      const overlaysRaw = get("overlays");
+      let iconProfiles = [];
+      try {
+        if (iconProfilesRaw) iconProfiles = JSON.parse(iconProfilesRaw);
+      } catch (e) {
+      }
+      let overlays = [];
+      try {
+        if (overlaysRaw) overlays = JSON.parse(overlaysRaw);
+      } catch (e) {
+      }
+      let initialCenter;
+      const cx = get("initialcenterx");
+      const cy = get("initialcentery");
+      if (cx != null && cy != null) initialCenter = { x: parseFloat(cx), y: parseFloat(cy) };
+      return {
+        imageUrl,
+        markersUrl,
+        imgW: parseFloat((_c = get("imgw")) != null ? _c : "800"),
+        imgH: parseFloat((_d = get("imgh")) != null ? _d : "600"),
+        minZoom: parseFloat((_e = get("minzoom")) != null ? _e : "0.1"),
+        maxZoom: parseFloat((_f = get("maxzoom")) != null ? _f : "10"),
+        width: (_g = get("width")) != null ? _g : void 0,
+        height: (_h = get("height")) != null ? _h : void 0,
+        align: (_i = get("align")) != null ? _i : void 0,
+        initialZoom: get("initialzoom") ? parseFloat(get("initialzoom")) : void 0,
+        initialCenter,
+        iconProfiles,
+        overlays
+      };
+    }
+    loadMarkers(container) {
+      const dataMarkers = container.getAttribute("data-zm-markers");
+      if (dataMarkers) {
+        try {
+          return JSON.parse(dataMarkers);
+        } catch (e) {
+        }
+      }
+      const script = container.querySelector("script.zm-markers-json");
+      if (script == null ? void 0 : script.textContent) {
+        try {
+          return JSON.parse(script.textContent);
+        } catch (e) {
+        }
+      }
+      return [];
+    }
+    async fetchMarkers() {
+      var _a;
+      if (!this.cfg.markersUrl) return [];
+      try {
+        const resp = await fetch(this.cfg.markersUrl);
+        if (!resp.ok) return [];
+        const data = await resp.json();
+        return (_a = data == null ? void 0 : data.markers) != null ? _a : [];
+      } catch (e) {
+        console.warn("ZoomMap static: failed to load markers from", this.cfg.markersUrl, e);
+        return [];
+      }
+    }
+    /* ---- DOM construction ---- */
+    buildDom() {
+      this.container.style.position = "relative";
+      this.container.style.overflow = "hidden";
+      if (this.cfg.width) this.container.style.width = this.cfg.width;
+      if (this.cfg.height) this.container.style.height = this.cfg.height;
+      this.viewport = el("div", this.container, {}, "zm-st-viewport");
+      this.viewport.style.cssText = "position:absolute;inset:0;overflow:hidden;cursor:grab;";
+      if (this.cfg.responsive) {
+        const aspect = this.cfg.imgW / this.cfg.imgH;
+        this.viewport.style.position = "relative";
+        this.viewport.style.width = "100%";
+        this.viewport.style.aspectRatio = String(aspect);
+      }
+      this.world = el("div", this.viewport, {}, "zm-st-world");
+      this.world.style.cssText = "position:absolute;transform-origin:0 0;will-change:transform;";
+      this.imgEl = el("img", this.world);
+      this.imgEl.style.cssText = "position:absolute;top:0;left:0;display:block;pointer-events:none;user-select:none;";
+      this.imgEl.draggable = false;
+      this.overlaysEl = el("div", this.world, {}, "zm-st-overlays");
+      this.overlaysEl.style.cssText = "position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;";
+      this.markersEl = el("div", this.world, {}, "zm-st-markers");
+      this.markersEl.style.cssText = "position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;";
+      this.buildZoomHud();
+    }
+    buildZoomHud() {
+      this.zoomHud = el("div", this.container, {}, "zm-st-zoomhud");
+      this.zoomHud.style.cssText = "position:absolute;bottom:8px;right:8px;display:flex;align-items:center;gap:4px;background:rgba(0,0,0,0.6);color:#fff;border-radius:6px;padding:4px 8px;font-size:13px;font-family:sans-serif;z-index:100;user-select:none;";
+      this.zoomOutBtn = el("button", this.zoomHud, {}, "zm-st-zoombtn");
+      this.zoomOutBtn.textContent = "\u2212";
+      this.zoomOutBtn.style.cssText = "background:none;border:1px solid rgba(255,255,255,0.3);color:#fff;border-radius:3px;width:24px;height:24px;cursor:pointer;display:flex;align-items:center;justify-content:center;";
+      this.zoomPercentEl = el("span", this.zoomHud);
+      this.zoomPercentEl.style.cssText = "min-width:48px;text-align:center;";
+      this.zoomInBtn = el("button", this.zoomHud, {}, "zm-st-zoombtn");
+      this.zoomInBtn.textContent = "+";
+      this.zoomInBtn.style.cssText = this.zoomOutBtn.style.cssText;
+      this.zoomInBtn.onclick = () => this.zoomAt(1.3);
+      this.zoomOutBtn.onclick = () => this.zoomAt(1 / 1.3);
+      this.updateZoomHud();
+    }
+    /* ---- base image loading ---- */
+    async loadBaseImage() {
+      if (!this.cfg.imageUrl) return;
+      return new Promise((resolve) => {
+        this.imgEl.onload = () => {
+          if (!this.imgW || !this.imgH) {
+            this.imgW = this.imgEl.naturalWidth;
+            this.imgH = this.imgEl.naturalHeight;
+          }
+          this.world.style.width = `${this.imgW}px`;
+          this.world.style.height = `${this.imgH}px`;
+          resolve();
+        };
+        this.imgEl.onerror = () => resolve();
+        this.imgEl.src = this.cfg.imageUrl;
+      });
+    }
+    /* ---- initial view ---- */
+    applyInitialView() {
+      var _a, _b, _c, _d;
+      if (this.cfg.initialViewRect) {
+        this.fitToRect(this.cfg.initialViewRect);
+      } else {
+        let z = this.cfg.initialZoom;
+        if (z == null) {
+          z = this.calcFitScale();
+        }
+        const cx = (_b = (_a = this.cfg.initialCenter) == null ? void 0 : _a.x) != null ? _b : this.imgW / 2;
+        const cy = (_d = (_c = this.cfg.initialCenter) == null ? void 0 : _c.y) != null ? _d : this.imgH / 2;
+        this.setView(z, cx, cy);
+      }
+    }
+    calcFitScale() {
+      const vw = this.viewport.clientWidth || 1;
+      const vh = this.viewport.clientHeight || 1;
+      const s = Math.min(vw / (this.imgW || 1), vh / (this.imgH || 1));
+      return Math.max(this.cfg.minZoom, Math.min(this.cfg.maxZoom, s));
+    }
+    fitToRect(r) {
+      const rw = r.right - r.left;
+      const rh = r.bottom - r.top;
+      if (rw <= 0 || rh <= 0) return;
+      const vw = this.viewport.clientWidth || 1;
+      const vh = this.viewport.clientHeight || 1;
+      const s = Math.min(vw / rw, vh / rh);
+      const cx = r.left + rw / 2;
+      const cy = r.top + rh / 2;
+      this.setView(s, cx, cy);
+    }
+    fitToView() {
+      const z = this.calcFitScale();
+      this.setView(z, this.imgW / 2, this.imgH / 2);
+    }
+    /* ---- view control ---- */
+    setView(scale, worldCx, worldCy) {
+      this.scale = Math.max(this.cfg.minZoom, Math.min(this.cfg.maxZoom, scale));
+      const vw = this.viewport.clientWidth || 1;
+      const vh = this.viewport.clientHeight || 1;
+      this.tx = vw / 2 - worldCx * this.scale;
+      this.ty = vh / 2 - worldCy * this.scale;
+      this.applyTransform();
+    }
+    zoomAt(factor, cx, cy) {
+      const vw = this.viewport.clientWidth || 1;
+      const vh = this.viewport.clientHeight || 1;
+      const sx = cx != null ? cx : vw / 2;
+      const sy = cy != null ? cy : vh / 2;
+      const worldX = (sx - this.tx) / this.scale;
+      const worldY = (sy - this.ty) / this.scale;
+      const newScale = Math.max(
+        this.cfg.minZoom,
+        Math.min(this.cfg.maxZoom, this.scale * factor)
+      );
+      if (newScale === this.scale) return;
+      this.tx = sx - worldX * newScale;
+      this.ty = sy - worldY * newScale;
+      this.scale = newScale;
+      this.applyTransform();
+      this.renderMarkers();
+      this.updateZoomHud();
+    }
+    applyTransform() {
+      this.world.style.transform = `translate(${this.tx}px, ${this.ty}px) scale(${this.scale})`;
+      if (this.gridSvg) this.updateGridTransform();
+    }
+    /* ---- marker rendering ---- */
+    renderMarkers() {
+      var _a, _b, _c, _d, _e, _f;
+      this.closePopover();
+      while (this.markersEl.firstChild) this.markersEl.removeChild(this.markersEl.firstChild);
+      const s = this.scale;
+      for (const m of this.markers) {
+        if (m.minZoom !== void 0 && s < m.minZoom) continue;
+        if (m.maxZoom !== void 0 && s > m.maxZoom) continue;
+        const icon = this.iconMap.get((_a = m.iconKey) != null ? _a : "__default__");
+        if (!icon && !m.iconKey) {
+          this.renderSimpleMarker(m);
+          continue;
+        }
+        if (!icon) {
+          this.renderSimpleMarker(m);
+          continue;
+        }
+        const scaleMul = (_b = m.scale) != null ? _b : 1;
+        const size = icon.size * scaleMul;
+        const ax = icon.anchorX;
+        const ay = icon.anchorY;
+        const leftPx = m.x * this.imgW;
+        const topPx = m.y * this.imgH;
+        const host = el("div", this.markersEl, {}, "zm-st-marker");
+        host.style.cssText = `position:absolute;left:${leftPx}px;top:${topPx}px;pointer-events:auto;z-index:10;`;
+        const anchor = el("div", host);
+        anchor.style.cssText = `transform:translate(${-ax}px, ${-ay}px);`;
+        const img = el("img", anchor, {}, "zm-st-marker-icon");
+        img.src = icon.url;
+        img.style.width = `${size}px`;
+        img.style.height = "auto";
+        img.draggable = false;
+        img.style.pointerEvents = "none";
+        if (icon.rotationDeg) {
+          host.style.transform = `rotate(${icon.rotationDeg}deg)`;
+        }
+        if (icon.shadowEnabled) {
+          const sc = (_c = icon.shadowColor) != null ? _c : "rgba(0,0,0,0.35)";
+          const blur = (_d = icon.shadowBlurPx) != null ? _d : 3;
+          const sx = (_e = icon.shadowOffsetXPx) != null ? _e : 1;
+          const sy = (_f = icon.shadowOffsetYPx) != null ? _f : 1;
+          img.style.filter = `drop-shadow(${sx}px ${sy}px ${blur}px ${sc})`;
+        }
+        if (m.tooltip) {
+          host.title = m.tooltip;
+        }
+        if (m.link) {
+          host.style.cursor = "pointer";
+          host.addEventListener("click", (e) => {
+            e.stopPropagation();
+            window.open(m.link, "_self");
+          });
+        }
+        if (m.tooltip) {
+          host.addEventListener("mouseenter", () => this.showTooltip(host, m));
+          host.addEventListener("mouseleave", () => this.hideTooltip());
+        }
+      }
+    }
+    renderSimpleMarker(m) {
+      const dot = el("div", this.markersEl, {}, "zm-st-simple-marker");
+      dot.style.cssText = `position:absolute;left:${m.x * this.imgW}px;top:${m.y * this.imgH}px;width:10px;height:10px;border-radius:50%;background:#e74c3c;border:2px solid #fff;transform:translate(-5px,-5px);pointer-events:auto;z-index:10;cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,0.3);`;
+      if (m.tooltip) dot.title = m.tooltip;
+      if (m.link) {
+        dot.addEventListener("click", (e) => {
+          e.stopPropagation();
+          window.open(m.link, "_self");
+        });
+      }
+    }
+    showTooltip(host, m) {
+      var _a;
+      this.hideTooltip();
+      const tip = el("div", document.body, {}, "zm-st-tooltip");
+      tip.textContent = (_a = m.tooltip) != null ? _a : "";
+      tip.style.cssText = "position:fixed;z-index:99999;background:rgba(0,0,0,0.85);color:#fff;padding:6px 10px;border-radius:4px;font-size:13px;pointer-events:none;white-space:nowrap;font-family:sans-serif;";
+      this.tooltipEl = tip;
+      this.repositionTooltip(host);
+    }
+    repositionTooltip(host) {
+      if (!this.tooltipEl) return;
+      const r = host.getBoundingClientRect();
+      this.tooltipEl.style.left = `${r.left + r.width / 2}px`;
+      this.tooltipEl.style.top = `${r.top - 30}px`;
+      this.tooltipEl.style.transform = "translate(-50%, 0)";
+    }
+    hideTooltip() {
+      if (this.tooltipEl) {
+        this.tooltipEl.remove();
+        this.tooltipEl = null;
+      }
+    }
+    /* ---- popover ---- */
+    closePopover() {
+      if (this.activePopover) {
+        this.activePopover.remove();
+        this.activePopover = null;
+      }
+      this.activeMarkerEl = null;
+    }
+    /* ---- overlays ---- */
+    renderOverlays() {
+      for (const o of this.overlays) {
+        const elm = el("img", this.overlaysEl);
+        elm.src = o.url;
+        elm.style.cssText = "position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;object-fit:contain;";
+        elm.draggable = false;
+        if (!o.visible) elm.style.display = "none";
+      }
+    }
+    /* ---- grid ---- */
+    renderGrid() {
+      var _a, _b, _c;
+      if (!((_a = this.cfg.grid) == null ? void 0 : _a.visible)) return;
+      this.gridSvg = svgEl("svg", this.world, {
+        width: String(this.imgW),
+        height: String(this.imgH)
+      });
+      this.gridSvg.style.cssText = "position:absolute;top:0;left:0;pointer-events:none;z-index:50;";
+      this.gridSvg.setAttribute("viewBox", `0 0 ${this.imgW} ${this.imgH}`);
+      this.gridStaticLayer = createSvgEl("g", this.gridSvg);
+      const g = this.cfg.grid;
+      const color = (_b = g.color) != null ? _b : "rgba(128,128,128,0.35)";
+      const lw = (_c = g.lineWidth) != null ? _c : 1;
+      let d = "";
+      if (g.kind === "square") {
+        d = this.buildSquareGridPath(g.spacing, g.anchorX, g.anchorY);
+      } else {
+        d = this.buildHexGridPath(g.spacing, g.anchorX, g.anchorY);
+      }
+      const path = createSvgEl("path", this.gridStaticLayer, {
+        d,
+        stroke: color,
+        "stroke-width": String(lw),
+        fill: "none",
+        "vector-effect": "non-scaling-stroke"
+      });
+      this.updateGridTransform();
+    }
+    buildSquareGridPath(spacing, ax, ay) {
+      const step = Math.max(2, spacing);
+      let d = "";
+      const startX = ax + Math.floor((0 - ax) / step) * step;
+      for (let x = startX; x <= this.imgW; x += step) d += `M${x},0 L${x},${this.imgH} `;
+      const startY = ay + Math.floor((0 - ay) / step) * step;
+      for (let y = startY; y <= this.imgH; y += step) d += `M0,${y} L${this.imgW},${y} `;
+      return d.trim();
+    }
+    buildHexGridPath(spacing, ax, ay) {
+      const hexW = Math.max(8, spacing);
+      const r = hexW / 2;
+      const hexH = Math.sqrt(3) * r;
+      const dx = 1.5 * r;
+      const dy = hexH;
+      let d = "";
+      const startCol = Math.floor((0 - ax) / dx);
+      const startRow = Math.floor((0 - ay - r) / dy);
+      for (let row = startRow; row * dy + r <= this.imgH + dy; row++) {
+        const offset = row % 2 === 0 ? ax : ax + dx / 2;
+        for (let col = startCol; col * dx + offset <= this.imgW + dx; col++) {
+          const cx = col * dx + offset;
+          const cy = r + row * dy;
+          const pts = [];
+          for (let i = 0; i < 6; i++) {
+            const angle = Math.PI / 3 * i - Math.PI / 6;
+            pts.push(`${cx + r * Math.cos(angle)},${cy + r * Math.sin(angle)}`);
+          }
+          d += `M${pts.join(" L")} Z `;
+        }
+      }
+      return d.trim();
+    }
+    updateGridTransform() {
+      if (!this.gridSvg) return;
+    }
+    /* ---- zoom HUD ---- */
+    updateZoomHud() {
+      this.zoomPercentEl.textContent = `${Math.round(this.scale * 100)}%`;
+    }
+    /* ---- events ---- */
+    attachEvents() {
+      this.viewport.addEventListener("mousedown", this.onPointerDown);
+      window.addEventListener("mousemove", this.onPointerMove);
+      window.addEventListener("mouseup", this.onPointerUp);
+      this.viewport.addEventListener("touchstart", this.onTouchStart, { passive: false });
+      window.addEventListener("touchmove", this.onTouchMove, { passive: false });
+      window.addEventListener("touchend", this.onTouchEnd);
+      this.viewport.addEventListener("wheel", this.onWheel, { passive: false });
+      this.viewport.addEventListener("dblclick", this.onDblClick);
+      window.addEventListener("resize", this.handleResize);
+    }
+    getEventPos(e) {
+      const r = this.viewport.getBoundingClientRect();
+      return { x: e.clientX - r.left, y: e.clientY - r.top };
+    }
+  };
 
   // src/static-entry.ts
-  var STATIC_CSS = `
-:root{--ttrpgtools-hover-popover-max-width:720px}
-.zm-root{position:relative;width:100%;height:480px;background:var(--background-secondary,#1e1e1e);border:1px solid var(--background-modifier-border,#444);border-radius:6px;overflow:hidden;}
-.zm-viewport{position:absolute;inset:0;overflow:hidden;touch-action:none;background:var(--background-primary,#111);}
-.zm-root.zm-root--framepad{background:transparent;border:none;}
-.zm-root.zm-root--framepad .zm-viewport{border:1px solid var(--background-modifier-border,#444);border-radius:6px;}
-.zm-frame-layer{position:absolute;inset:0;pointer-events:none;z-index:40;}
-.zm-viewport-frame{position:absolute;inset:0;width:100%;height:100%;object-fit:fill;object-position:center;pointer-events:none;user-select:none;-webkit-user-drag:none;}
-.zm-hud-layer{position:absolute;inset:0;pointer-events:none;z-index:60;}
-.zm-world{position:absolute;left:0;top:0;transform-origin:0 0;will-change:transform;}
-.zm-base-img{position:absolute;left:0;top:0;width:100%;height:100%;object-fit:contain;image-rendering:auto;user-select:none;-webkit-user-drag:none;pointer-events:none;display:block;}
-.zm-overlay-layer{position:absolute;inset:0;overflow:hidden;pointer-events:none;}
-.zm-overlay-img{position:absolute;pointer-events:none;user-select:none;-webkit-user-drag:none;image-rendering:auto;opacity:var(--zm-overlay-opacity,1);transform-origin:0 0;}
-.zm-draw-layer{position:absolute;inset:0;pointer-events:none;z-index:30;}
-.zm-draw-layer canvas,.zm-draw-layer svg{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;}
-.zm-grid-layer{position:absolute;inset:0;pointer-events:none;z-index:35;}
-.zm-grid-layer svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible;pointer-events:none;}
-.zm-grid-layer text{fill:var(--zm-grid-color,#aaa);font-family:monospace;font-size:11px;text-anchor:middle;dominant-baseline:middle;}
-.zm-grid-layer line,.zm-grid-layer path{fill:none;stroke:var(--zm-grid-color,#aaa);stroke-width:0.5;stroke-opacity:0.4;vector-effect:non-scaling-stroke;}
-.zm-grid-layer .zm-grid-hex{fill:none;stroke:var(--zm-grid-color,#aaa);stroke-width:0.5;stroke-opacity:0.4;}
-.zm-marker-layer{position:absolute;inset:0;overflow:visible;pointer-events:none;z-index:50;}
-.zm-marker-el{position:absolute;transform-origin:var(--zm-anchor-x,50%) var(--zm-anchor-y,50%);cursor:pointer;pointer-events:auto;user-select:none;-webkit-user-drag:none;filter:var(--zm-marker-shadow,none);}
-.zm-marker-el img,.zm-marker-el svg{display:block;width:var(--zm-icon-size,26px);height:auto;image-rendering:auto;pointer-events:none;}
-.zm-marker-el.zm-marker-simple{width:18px;height:18px;border-radius:50%;background:var(--zm-dot-color,#e74c3c);border:2px solid #fff;box-shadow:0 0 3px rgba(0,0,0,0.5);transform:translate(-9px,-9px);}
-.zm-marker-el.zm-marker-simple:hover{transform:translate(-9px,-9px) scale(1.3);background:var(--zm-dot-hover,#ff6b6b);}
-.zm-text-layer{position:absolute;inset:0;overflow:visible;pointer-events:none;z-index:45;}
-.zm-text-item{position:absolute;transform-origin:0 0;font-family:var(--zm-text-font,serif);color:var(--zm-text-color,#fff);text-shadow:var(--zm-text-shadow,0 1px 3px rgba(0,0,0,0.8));white-space:nowrap;pointer-events:none;user-select:none;}
-.zm-text-bold{font-weight:bold;}
-.zm-text-italic{font-style:italic;}
-.zm-zoom-hud{position:absolute;bottom:8px;right:8px;display:flex;align-items:center;gap:4px;background:rgba(0,0,0,0.65);color:#fff;border-radius:6px;padding:4px 8px;font-size:12px;font-family:monospace;z-index:70;user-select:none;pointer-events:auto;}
-.zm-zoom-btn{background:none;border:1px solid rgba(255,255,255,0.3);color:#fff;border-radius:3px;width:22px;height:22px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:14px;line-height:1;padding:0;}
-.zm-zoom-btn:hover{background:rgba(255,255,255,0.15);}
-.zm-tooltip-el{position:fixed;z-index:99999;background:rgba(0,0,0,0.85);color:#fff;padding:6px 10px;border-radius:4px;font-size:13px;pointer-events:none;white-space:nowrap;font-family:-apple-system,sans-serif;transition:opacity 100ms ease;}
-.zm-marker-tooltip{position:absolute;z-index:999;background:var(--background-primary,#1e1e1e);border:1px solid var(--background-modifier-border,#444);border-radius:6px;padding:8px 12px;font-size:13px;pointer-events:none;white-space:nowrap;font-family:-apple-system,sans-serif;box-shadow:0 4px 12px rgba(0,0,0,0.3);max-width:320px;white-space:normal;word-wrap:break-word;}
-.zm-loading{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--text-muted,#999);font-size:14px;font-family:-apple-system,sans-serif;z-index:80;}
-/* Timeline styles */
-.tl-root{position:relative;width:100%;font-family:-apple-system,sans-serif;color:var(--text-normal,#ddd);}
-.tl-h-scroller{overflow-x:auto;overflow-y:visible;padding-bottom:16px;}
-.tl-h-timeline{min-width:100%;width:max-content;padding:16px 0;}
-.tl-h-row{display:grid;grid-template-columns:repeat(var(--tl-h-cols,1),var(--tl-h-col-w,600px));column-gap:var(--tl-h-gap,0px);row-gap:12px;align-items:start;}
-.tl-h-slot{grid-column-start:var(--tl-h-col);display:flex;flex-direction:column;gap:12px;}
-.tl-h-item{border:1px solid var(--tl-accent,var(--background-modifier-border,#444));border-radius:10px;overflow:hidden;background:var(--background-primary,#1e1e1e);}
-.tl-h-item .tl-header{background:var(--tl-accent,rgba(100,100,255,0.12));padding:8px 12px;font-weight:600;font-size:15px;}
-.tl-h-item .tl-grid{display:grid;}
-.tl-h-item .tl-grid.no-media{grid-template-columns:var(--tl-h-col-w,600px);}
-.tl-h-item .tl-grid.has-media{grid-template-columns:var(--tl-media-w,200px) max(160px,calc(var(--tl-h-col-w,600px) - var(--tl-media-w,200px)));}
-.tl-h-item.tl-align-right .tl-grid.has-media{grid-template-columns:max(160px,calc(var(--tl-h-col-w,600px) - var(--tl-media-w,200px))) var(--tl-media-w,200px);}
-.tl-h-item .tl-media{grid-area:media;overflow:hidden;}
-.tl-h-item .tl-media img{width:100%;height:100%;object-fit:cover;display:block;}
-.tl-h-item .tl-box{grid-area:box;padding:10px 12px;font-size:13px;line-height:1.5;}
-.tl-h-item .tl-desc{color:var(--text-muted,#aaa);font-size:12px;margin-top:4px;}
-.tl-h-item .tl-grid.no-media{grid-template-columns:var(--tl-h-col-w,600px);}
-.tl-h-item .tl-grid.has-media{grid-template-columns:var(--tl-media-w,200px) max(160px,calc(var(--tl-h-col-w,600px) - var(--tl-media-w,200px)));}
-.tl-h-item.tl-align-right .tl-grid.has-media{grid-template-columns:max(160px,calc(var(--tl-h-col-w,600px) - var(--tl-media-w,200px))) var(--tl-media-w,200px);}
-.tl-h-timeline{display:block;}
-.tl-h-row{display:grid;grid-template-columns:repeat(var(--tl-h-cols,1),var(--tl-h-col-w,600px));column-gap:var(--tl-h-gap,0px);row-gap:12px;align-items:start;}
-.tl-h-slot{grid-column-start:var(--tl-h-col);display:flex;flex-direction:column;gap:12px;}
-@media (max-width:900px){
-  .tl-h-scroller{--tl-h-col-w:420px;}
-  .tl-grid.has-media{grid-template-columns:1fr!important;grid-template-areas:'media' 'box'!important;}
-  .tl-media{width:100%!important;height:auto!important;border-radius:10px 10px 0 0;}
-  .tl-media img{width:100%;height:auto!important;object-fit:cover;display:block;border-radius:10px 10px 0 0;}
-  .tl-box.has-media{border-radius:0 0 10px 10px;border:1px solid var(--tl-accent,var(--background-modifier-border,#444));border-top:none;}
-}
-`;
-  (function initStaticRuntime() {
-    const style = document.createElement("style");
-    style.id = "ttrpg-tools-static-css";
-    style.textContent = STATIC_CSS;
-    document.head.appendChild(style);
-    const jsCode = buildStaticJsBlock();
-    try {
-      const fn = new Function(jsCode);
-      fn();
-    } catch (err) {
-      console.error("[TTRPG-Tools Static] Runtime error:", err);
+  var instances = [];
+  function scan() {
+    var _a;
+    const containers = document.querySelectorAll(
+      "[data-zm-config], .zm-static-root, .zoommap-container"
+    );
+    for (const c of containers) {
+      if (c.classList.contains("zm-static-initialised") || c.hasAttribute("data-zm-inited")) continue;
+      c.classList.add("zm-static-initialised");
+      c.setAttribute("data-zm-inited", "1");
+      const hasConfig = c.hasAttribute("data-zm-config") || c.querySelector("script.zm-config-json");
+      if (!hasConfig) continue;
+      const map = new StaticMap(c);
+      instances.push(map);
     }
-  })();
+    const codeBlocks = document.querySelectorAll("pre code.language-zoommap");
+    for (const cb of codeBlocks) {
+      if (cb.hasAttribute("data-zm-handled")) continue;
+      cb.setAttribute("data-zm-handled", "1");
+      const preBlock = cb.parentElement;
+      if (!preBlock) continue;
+      const yamlText = (_a = cb.textContent) != null ? _a : "";
+      const config = parseZoommapYaml(yamlText);
+      if (!config) continue;
+      const wrapper = document.createElement("div");
+      wrapper.className = "zm-static-root zm-static-initialised";
+      wrapper.setAttribute("data-zm-inited", "1");
+      wrapper.setAttribute("data-zm-config", JSON.stringify(config));
+      preBlock.replaceWith(wrapper);
+      const map = new StaticMap(wrapper);
+      instances.push(map);
+      if (config.markersUrl) {
+        fetch(config.markersUrl).then((r) => r.ok ? r.json() : null).then((data) => {
+          if (data == null ? void 0 : data.markers) {
+            const markers = data.markers;
+            wrapper.setAttribute("data-zm-markers", JSON.stringify(markers));
+            map.destroy();
+            const newMap = new StaticMap(wrapper);
+            instances = instances.filter((m) => m !== map);
+            instances.push(newMap);
+          }
+        }).catch(() => {
+        });
+      }
+    }
+  }
+  function parseZoommapYaml(text) {
+    var _a, _b, _c, _d;
+    const lines = text.split("\n");
+    const map = {};
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith("#")) continue;
+      const idx = trimmed.indexOf(":");
+      if (idx < 0) continue;
+      const key = trimmed.substring(0, idx).trim();
+      const value = trimmed.substring(idx + 1).trim();
+      map[key] = value;
+    }
+    if (!map.image || !map.markers) return null;
+    const imgW = parseFloat((_a = map.imgW) != null ? _a : "0") || void 0;
+    const imgH = parseFloat((_b = map.imgH) != null ? _b : "0") || void 0;
+    return {
+      imageUrl: map.image,
+      markersUrl: map.markers,
+      minZoom: parseFloat((_c = map.minZoom) != null ? _c : "0.1"),
+      maxZoom: parseFloat((_d = map.maxZoom) != null ? _d : "10"),
+      imgW: imgW != null ? imgW : 800,
+      imgH: imgH != null ? imgH : 600,
+      width: map.width,
+      height: map.height,
+      align: map.align,
+      initialZoom: map.initialZoom ? parseFloat(map.initialZoom) : void 0,
+      iconProfiles: []
+    };
+  }
+  function destroyAll() {
+    for (const m of instances) m.destroy();
+    instances = [];
+  }
+  var api = {
+    create(el2, config, markers) {
+      el2.classList.add("zm-static-root", "zm-static-initialised");
+      el2.setAttribute("data-zm-inited", "1");
+      el2.setAttribute("data-zm-config", JSON.stringify(config));
+      if (markers && markers.length > 0) {
+        el2.setAttribute("data-zm-markers", JSON.stringify(markers));
+      }
+      const map = new StaticMap(el2);
+      instances.push(map);
+      return map;
+    },
+    scan,
+    destroyAll
+  };
+  window.ZoomMapStatic = api;
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", () => scan());
+  } else {
+    scan();
+  }
 })();
