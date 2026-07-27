@@ -10,7 +10,7 @@ Publish this note, then use **Publish changes → Add linked** to include all ma
 
 ## Assets
 
-- [星图.svg](/img/user/TRPG%E8%A7%84%E5%88%99/%E4%BC%AF%E7%88%B5%E7%BA%A2%E8%8C%B6/%E6%98%9F%E5%9B%BE/%E6%98%9F%E5%9B%BE.svg)
+- [[the Vast.svg\|the Vast.svg]]
 - [[ZoomMap/publish/assets\|ZoomMap/publish/assets]]
 - [[ZoomMap/publish/library\|ZoomMap/publish/library]]
 - [[ZoomMap/publish/markers/m-rji0pv\|ZoomMap/publish/markers/m-rji0pv]]
