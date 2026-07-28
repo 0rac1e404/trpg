@@ -1,0 +1,7 @@
+---
+zoommapMarkersPath: TRPG规则/伯爵红茶/星图/the Vast.excalidraw.markers.json
+sourceFile: TRPG规则/伯爵红茶/星图/the Vast.excalidraw.markers.json
+---
+
+
+{"size":{"w":1308,"h":916},"layers":[{"id":"default","name":"Default","visible":true,"locked":false}],"markers":[{"type":"pin","id":"marker_kvyvll","x":0.45772372703844394,"y":0.43585197806226195,"layer":"default","link":"TRPG规则/伯爵红茶/星图/隅纳","iconKey":"port","tooltip":"隅纳","scaleLikeSticker":true,"tooltipAlwaysOn":true,"sizeOverride":18},{"type":"pin","id":"marker_w5m81j","x":0.6468804746223517,"y":0.46526937485971687,"layer":"default","link":"首都","iconKey":"port","tooltip":"首都","tooltipAlwaysOn":true,"sizeOverride":18,"scaleLikeSticker":true},{"type":"pin","id":"marker_pe84e4","x":0.694230385426001,"y":0.3492885890661669,"layer":"default","link":"大伊甸","iconKey":"port","tooltip":"大伊甸","scaleLikeSticker":true,"tooltipAlwaysOn":true,"sizeOverride":18}],"bases":[{"path":"TRPG规则/伯爵红茶/星图/the Vast.excalidraw.svg"}],"overlays":[],"activeBase":"TRPG规则/伯爵红茶/星图/the Vast.excalidraw.svg","measurement":{"scales":{},"customUnitPxPerUnit":{},"travelTimePresetIds":[],"travelDaysEnabled":false,"displayUnit":"km"},"pinSizeOverrides":{},"grids":[],"panClamp":true,"drawLayers":[],"drawings":[],"secondScreen":{"showGrids":true},"textLayers":[]}
