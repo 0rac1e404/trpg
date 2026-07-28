@@ -105,15 +105,32 @@ function main() {
 function extractSvgPaths(raw) {
   const paths = [];
 
+  // Try markdown JSON code block first (old format)
   const jsonMatch = raw.match(/```json\s*\r?\n([\s\S]*?)\n```/);
-  if (!jsonMatch) return paths;
 
   let data;
-  try {
-    data = JSON.parse(jsonMatch[1]);
-  } catch (_e) {
-    return paths;
+  if (jsonMatch) {
+    try {
+      data = JSON.parse(jsonMatch[1]);
+    } catch (_e) {
+      // fall through to raw JSON parsing
+    }
   }
+
+  // Fallback: try parsing content after frontmatter as raw JSON (new format)
+  if (!data) {
+    const parsed = matter(raw);
+    const body = (parsed.content ?? "").trim();
+    if (body.startsWith("{")) {
+      try {
+        data = JSON.parse(body);
+      } catch (_e) {
+        return paths;
+      }
+    }
+  }
+
+  if (!data) return paths;
 
   // activeBase
   if (typeof data.activeBase === "string") paths.push(data.activeBase);
