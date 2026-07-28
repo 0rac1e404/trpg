@@ -946,7 +946,8 @@
   ];
   function parseZoommapYaml(text) {
     var _a, _b, _c, _d;
-    const lines = text.split("\n");
+    const cleanText = text.replace(/^>\s?/gm, "");
+    const lines = cleanText.split("\n");
     const map = {};
     const imageBases = [];
     let inImageBases = false;

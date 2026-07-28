@@ -83,6 +83,8 @@ function extractMarkersPaths(rawMd) {
 
   while ((m = zmRegex.exec(rawMd)) !== null) {
     var yamlText = m[1];
+    // Strip callout prefixes (> or > ) so blocks inside >[!NOTE] etc. work
+    yamlText = yamlText.replace(/^>\s?/gm, "");
     var mkMatch = yamlText.match(
       /^markers:\s*["']?([^\n\r"']+)["']?\s*$/m
     );
