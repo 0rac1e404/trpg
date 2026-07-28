@@ -109,7 +109,6 @@
       const html = await resp.text();
       const parser = new DOMParser();
       const doc = parser.parseFromString(html, "text/html");
-      const titleEl = doc.querySelector("h1");
       const contentEl = doc.querySelector(".content") || doc.querySelector("article") || doc.querySelector("main");
       if (!contentEl) {
         pagePreviewCache.set(url, "");
@@ -117,14 +116,9 @@
       }
       const clone = contentEl.cloneNode(true);
       for (const h of clone.querySelectorAll("h1, h2")) h.remove();
-      for (const el2 of clone.querySelectorAll("nav, aside, footer, header, .backlinks, .graph, .toc, .search-container, .breadcrumbs")) el2.remove();
-      let previewHtml = "";
-      if (titleEl) {
-        const titleClone = titleEl.cloneNode(true);
-        previewHtml += '<div style="font-weight:600;margin-bottom:0.5em;unicode-bidi:plaintext;color:var(--text-accent);">' + titleClone.innerHTML + "</div>";
-      }
-      previewHtml += sanitizeHtml(clone.innerHTML);
-      const truncated = truncateHtml(previewHtml, 600);
+      for (const el2 of clone.querySelectorAll("nav, aside, footer, header, .backlinks, .graph, .toc, .search-container, .breadcrumbs, .markdown-embed-title")) el2.remove();
+      const sanitized = sanitizeHtml(clone.innerHTML);
+      const truncated = truncateHtml(sanitized, 500);
       pagePreviewCache.set(url, truncated);
       return truncated;
     } catch (_err) {
