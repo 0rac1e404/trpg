@@ -537,7 +537,7 @@
     }
     /* ---- initial view ---- */
     applyInitialView() {
-      var _a, _b, _c, _d;
+      var _a, _b;
       if (this.cfg.initialViewRect) {
         this.fitToRect(this.cfg.initialViewRect);
       } else {
@@ -545,8 +545,15 @@
         if (z == null) {
           z = this.calcFitScale();
         }
-        const cx = (_b = (_a = this.cfg.initialCenter) == null ? void 0 : _a.x) != null ? _b : this.imgW / 2;
-        const cy = (_d = (_c = this.cfg.initialCenter) == null ? void 0 : _c.y) != null ? _d : this.imgH / 2;
+        const ic = this.cfg.initialCenter;
+        let cx, cy;
+        if (ic && ic.x <= 1 && ic.y <= 1 && ic.x >= 0 && ic.y >= 0) {
+          cx = ic.x * this.imgW;
+          cy = ic.y * this.imgH;
+        } else {
+          cx = (_a = ic == null ? void 0 : ic.x) != null ? _a : this.imgW / 2;
+          cy = (_b = ic == null ? void 0 : ic.y) != null ? _b : this.imgH / 2;
+        }
         this.setView(z, cx, cy);
       }
     }
@@ -882,10 +889,6 @@
       wrapper.className = "zm-static-root zm-static-initialised";
       wrapper.setAttribute("data-zm-inited", "1");
       wrapper.setAttribute("data-zm-config", JSON.stringify(config));
-      preBlock.replaceWith(wrapper);
-      const map = new StaticMap(wrapper);
-      instances.push(map);
-      let markersLoaded = false;
       if (config.markersUrl) {
         const safeId = safeDataId(config.markersUrl);
         const embedded = document.getElementById(safeId);
@@ -894,26 +897,45 @@
             const data = JSON.parse(embedded.textContent);
             if (data == null ? void 0 : data.markers) {
               wrapper.setAttribute("data-zm-markers", JSON.stringify(data.markers));
-              markersLoaded = true;
             }
           } catch (_e) {
           }
         }
-        if (!markersLoaded) {
+      }
+      preBlock.replaceWith(wrapper);
+      const initMap = () => {
+        const map = new StaticMap(wrapper);
+        instances.push(map);
+        if (!wrapper.hasAttribute("data-zm-markers") && config.markersUrl) {
           fetch(config.markersUrl).then((r) => r.ok ? r.json() : null).catch(() => null).then((data) => {
             if (data == null ? void 0 : data.markers) {
               const markers = data.markers;
               wrapper.setAttribute("data-zm-markers", JSON.stringify(markers));
+              map.destroy();
+              const newMap = new StaticMap(wrapper);
+              instances = instances.filter((m) => m !== map);
+              instances.push(newMap);
             }
           }).catch(() => {
           });
         }
-      }
-      if (markersLoaded) {
-        map.destroy();
-        const newMap = new StaticMap(wrapper);
-        instances = instances.filter((m) => m !== map);
-        instances.push(newMap);
+      };
+      if ("IntersectionObserver" in window) {
+        const obs = new IntersectionObserver(
+          (entries) => {
+            for (const e of entries) {
+              if (e.isIntersecting) {
+                obs.disconnect();
+                initMap();
+                break;
+              }
+            }
+          },
+          { threshold: 0.01 }
+        );
+        obs.observe(wrapper);
+      } else {
+        initMap();
       }
     }
   }
@@ -951,9 +973,32 @@
     const map = {};
     const imageBases = [];
     let inImageBases = false;
+    let inView = false;
+    let _viewZoom = "";
+    let _viewCenterX = "";
+    let _viewCenterY = "";
     for (const line of lines) {
       const trimmed = line.trim();
       if (!trimmed || trimmed.startsWith("#")) continue;
+      if (trimmed === "view:" || trimmed.startsWith("view:")) {
+        inView = true;
+        continue;
+      }
+      if (inView) {
+        if (!trimmed.startsWith(" ")) {
+          inView = false;
+        } else {
+          const sidx = trimmed.indexOf(":");
+          if (sidx >= 0) {
+            const k = trimmed.substring(0, sidx).trim();
+            const v = trimmed.substring(sidx + 1).trim();
+            if (k === "zoom") _viewZoom = v;
+            else if (k === "centerX") _viewCenterX = v;
+            else if (k === "centerY") _viewCenterY = v;
+          }
+          continue;
+        }
+      }
       if (trimmed.startsWith("imageBases:") || trimmed.startsWith("imagebases:")) {
         inImageBases = true;
         continue;
@@ -993,6 +1038,9 @@
       url: normPath(p),
       name: `Base ${i + 2}`
     })) : void 0;
+    const initialZoom = _viewZoom ? parseFloat(_viewZoom) : map.initialZoom ? parseFloat(map.initialZoom) : void 0;
+    const hasViewCenter = _viewCenterX !== "" && _viewCenterY !== "";
+    const initialCenter = hasViewCenter ? { x: parseFloat(_viewCenterX), y: parseFloat(_viewCenterY) } : void 0;
     return {
       imageUrl,
       markersUrl,
@@ -1003,7 +1051,8 @@
       width: map.width,
       height: map.height,
       align: map.align,
-      initialZoom: map.initialZoom ? parseFloat(map.initialZoom) : void 0,
+      initialZoom,
+      initialCenter,
       iconProfiles: DEFAULT_ICONS,
       yamlBases: restBases
     };
