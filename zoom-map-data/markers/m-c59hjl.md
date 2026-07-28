@@ -59,6 +59,19 @@ sourceFile: TRPG规则/伯爵红茶/星图/the Vast.excalidraw.markers.json
       "scaleLikeSticker": true,
       "tooltipAlwaysOn": true,
       "sizeOverride": 18
+    },
+    {
+      "type": "pin",
+      "id": "marker_s3rctd",
+      "x": 0.23542304116909793,
+      "y": 0.29334882372851195,
+      "layer": "default",
+      "link": "韦奇伍德港",
+      "iconKey": "port",
+      "tooltip": "韦奇伍德港",
+      "scaleLikeSticker": true,
+      "tooltipAlwaysOn": true,
+      "sizeOverride": 18
     }
   ],
   "bases": [

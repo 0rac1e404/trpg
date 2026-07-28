@@ -3,8 +3,8 @@ publish: true
 ttrpgtools: "ttrpgtools-publish"
 ttrpgtoolsData: "library"
 sourceFile: "ZoomMap/library.json"
-zoommapSourceMtime: 1785215077937
-generatedAt: "2026-07-28T05:04:37.978Z"
+zoommapSourceMtime: 1785238548897
+generatedAt: "2026-07-28T11:35:48.931Z"
 ---
 
 # TTRPG Tools: Maps publish data (library)
@@ -53,6 +53,6 @@ generatedAt: "2026-07-28T05:04:37.978Z"
       "terrains": []
     }
   ],
-  "exportedAt": "2026-07-28T05:04:37.937Z"
+  "exportedAt": "2026-07-28T11:35:48.896Z"
 }
 ```
