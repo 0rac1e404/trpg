@@ -2,12 +2,39 @@
 (() => {
   // src/static-render.ts
   var NS = "http://www.w3.org/2000/svg";
+  var _pageIndexCache = void 0;
+  function getPageNameIndex() {
+    if (_pageIndexCache !== void 0) return _pageIndexCache;
+    try {
+      const el2 = document.getElementById("zm-data-zm-page-index");
+      if (el2 && el2.textContent) {
+        _pageIndexCache = JSON.parse(el2.textContent);
+        return _pageIndexCache;
+      }
+    } catch (_e) {
+    }
+    _pageIndexCache = null;
+    return null;
+  }
   function normalizeLink(link) {
     if (!link) return link;
     if (link.startsWith("http://") || link.startsWith("https://") || link.startsWith("#")) return link;
     let p = link.replace(/\.md$/i, "");
+    if (!p.includes("/")) {
+      const index = getPageNameIndex();
+      if (index && index[p]) {
+        return index[p];
+      }
+    }
     if (!p.startsWith("/")) p = "/" + p;
     if (!p.endsWith("/") && !/\.[a-zA-Z0-9]+$/.test(p)) p += "/";
+    if (!p.includes("/", 1)) {
+      const bare = p.replace(/^\/|\/$/g, "");
+      const index = getPageNameIndex();
+      if (index && index[bare]) {
+        return index[bare];
+      }
+    }
     return p;
   }
   function escapeHtml(s) {

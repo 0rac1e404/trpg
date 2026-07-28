@@ -63,6 +63,107 @@ function buildMarkersLookup() {
   return lookup;
 }
 
+// ---- Build page-name → permalink index ----
+// Scans all published notes in src/site/notes/ and creates a lookup
+// that maps short page names (and aliases) to their published URLs.
+// This enables the zoom-map static renderer to resolve links like
+// "首都" → "/TRPG规则/伯爵红茶/星图/首都/" instead of the wrong "/首都/".
+
+var _pageNameCache = null;
+var NOTES_ROOT = path.resolve(__dirname, "..", "site", "notes");
+
+function buildPageNameIndex() {
+  if (_pageNameCache !== null) return _pageNameCache;
+
+  var index = {};
+  if (!fs.existsSync(NOTES_ROOT)) {
+    _pageNameCache = index;
+    return index;
+  }
+
+  function scanDir(dir) {
+    var entries;
+    try {
+      entries = fs.readdirSync(dir, { withFileTypes: true });
+    } catch (_e) {
+      return;
+    }
+    for (var i = 0; i < entries.length; i++) {
+      var e = entries[i];
+      var full = path.join(dir, e.name);
+      if (e.isDirectory()) {
+        scanDir(full);
+      } else if (e.name.endsWith(".md")) {
+        try {
+          var raw = fs.readFileSync(full, "utf8");
+          var parsed = matter(raw);
+          var permalink = "";
+          if (parsed.data && typeof parsed.data.permalink === "string") {
+            permalink = parsed.data.permalink;
+          } else {
+            try {
+              var fm = JSON.parse(raw.split("\n---\n")[0].replace(/^---\n?/, "").trim());
+              permalink = fm.permalink || "";
+            } catch (_e2) {}
+          }
+          if (!permalink) continue;
+          // Ensure leading/trailing "/"
+          if (!permalink.startsWith("/")) permalink = "/" + permalink;
+          if (!permalink.endsWith("/")) permalink += "/";
+
+          // Page name = file name without extension
+          var pageName = e.name.replace(/\.md$/i, "");
+          // Prefer shorter path when there are duplicates
+          if (!index[pageName] || index[pageName].length > permalink.length) {
+            index[pageName] = permalink;
+          }
+
+          // Also index aliases (from frontmatter aliases / dg-note-properties)
+          var aliases = [];
+          // Standard YAML aliases (gray-matter handles these)
+          if (parsed.data && parsed.data.aliases) {
+            if (Array.isArray(parsed.data.aliases)) {
+              aliases = parsed.data.aliases;
+            } else if (typeof parsed.data.aliases === "string") {
+              aliases = [parsed.data.aliases];
+            }
+          }
+          // Try JSON frontmatter format: {"dg-note-properties":{"aliases":[...]}}
+          // Extract everything between the first "---\n" and "\n---"
+          try {
+            var fmMatch = raw.match(/^---\r?\n([\s\S]*?)\r?\n---/);
+            if (fmMatch) {
+              var fmText = fmMatch[1].trim();
+              if (fmText.startsWith("{")) {
+                var fmObj = JSON.parse(fmText);
+                if (fmObj.permalink && !permalink) {
+                  permalink = fmObj.permalink;
+                  if (!permalink.startsWith("/")) permalink = "/" + permalink;
+                  if (!permalink.endsWith("/")) permalink += "/";
+                }
+                var dgAliases = fmObj && fmObj["dg-note-properties"] && fmObj["dg-note-properties"].aliases;
+                if (Array.isArray(dgAliases)) {
+                  aliases = aliases.concat(dgAliases);
+                }
+              }
+            }
+          } catch (_e3) {}
+          for (var j = 0; j < aliases.length; j++) {
+            var alias = String(aliases[j]).trim();
+            if (alias && !index[alias]) {
+              index[alias] = permalink;
+            }
+          }
+        } catch (_e4) {}
+      }
+    }
+  }
+
+  scanDir(NOTES_ROOT);
+  _pageNameCache = index;
+  return index;
+}
+
 // ---- Encode path as safe DOM id (must match static-entry.ts safeDataId) ----
 
 function safeDataId(str) {
@@ -144,6 +245,17 @@ function userEleventySetup(eleventyConfig) {
       var lookup = buildMarkersLookup();
       var dataScripts = [];
       var seen = new Set();
+
+      // Embed page-name → permalink index for link resolution
+      var pageIndex = buildPageNameIndex();
+      var pageIndexId = safeDataId("zm-page-index");
+      dataScripts.push(
+        '<script type="application/json" id="' +
+          pageIndexId +
+          '">' +
+          JSON.stringify(pageIndex) +
+          "</script>"
+      );
 
       for (var i = 0; i < markersPaths.length; i++) {
         var mp = markersPaths[i];
