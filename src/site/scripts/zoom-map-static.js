@@ -3,10 +3,14 @@
   // src/static-render.ts
   var NS = "http://www.w3.org/2000/svg";
   var _pageIndexCache = void 0;
+  function safeDataId(str) {
+    return "zm-data-" + btoa(unescape(encodeURIComponent(str))).replace(/[+/=]/g, "_");
+  }
   function getPageNameIndex() {
     if (_pageIndexCache !== void 0) return _pageIndexCache;
     try {
-      const el2 = document.getElementById("zm-data-zm-page-index");
+      const pageIndexId = safeDataId("zm-page-index");
+      const el2 = document.getElementById(pageIndexId);
       if (el2 && el2.textContent) {
         _pageIndexCache = JSON.parse(el2.textContent);
         return _pageIndexCache;
@@ -989,7 +993,7 @@
       wrapper.setAttribute("data-zm-inited", "1");
       wrapper.setAttribute("data-zm-config", JSON.stringify(config));
       if (config.markersUrl) {
-        const safeId = safeDataId(config.markersUrl);
+        const safeId = safeDataId2(config.markersUrl);
         const embedded = document.getElementById(safeId);
         if (embedded && embedded.textContent) {
           try {
@@ -1038,7 +1042,7 @@
       }
     }
   }
-  function safeDataId(path) {
+  function safeDataId2(path) {
     const p = path.startsWith("/") ? path.slice(1) : path;
     return "zm-data-" + btoa(unescape(encodeURIComponent(p))).replace(/[+/=]/g, "_");
   }
