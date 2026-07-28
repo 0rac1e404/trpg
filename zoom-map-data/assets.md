@@ -13,3 +13,4 @@ Publish this note, then use **Publish changes → Add linked** to include all ma
 - [[ZoomMap/publish/assets]]
 - [[ZoomMap/publish/library]]
 - [[ZoomMap/publish/markers/m-c59hjl]]
+- [[ZoomMap/SVGs/rpg-awesome-raw-master/Font/anchor.svg]]

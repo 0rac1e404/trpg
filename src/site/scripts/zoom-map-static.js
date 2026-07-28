@@ -10,12 +10,6 @@
     if (!p.endsWith("/") && !/\.[a-zA-Z0-9]+$/.test(p)) p += "/";
     return p;
   }
-  function pageName(link) {
-    if (!link) return "";
-    const segments = link.replace(/\\/g, "/").split("/");
-    const last = segments[segments.length - 1] || "";
-    return last.replace(/\.md$/i, "") || link;
-  }
   function escapeHtml(s) {
     const d = document.createElement("div");
     d.textContent = s;
@@ -88,6 +82,7 @@
       const html = await resp.text();
       const parser = new DOMParser();
       const doc = parser.parseFromString(html, "text/html");
+      const titleEl = doc.querySelector("h1");
       const contentEl = doc.querySelector(".content") || doc.querySelector("article") || doc.querySelector("main");
       if (!contentEl) {
         pagePreviewCache.set(url, "");
@@ -95,9 +90,14 @@
       }
       const clone = contentEl.cloneNode(true);
       for (const h of clone.querySelectorAll("h1, h2")) h.remove();
-      for (const el2 of clone.querySelectorAll("nav, aside, footer, header")) el2.remove();
-      const sanitized = sanitizeHtml(clone.innerHTML);
-      const truncated = truncateHtml(sanitized, 400);
+      for (const el2 of clone.querySelectorAll("nav, aside, footer, header, .backlinks, .graph, .toc, .search-container, .breadcrumbs")) el2.remove();
+      let previewHtml = "";
+      if (titleEl) {
+        const titleClone = titleEl.cloneNode(true);
+        previewHtml += '<div style="font-weight:600;margin-bottom:0.5em;unicode-bidi:plaintext;color:var(--text-accent);">' + titleClone.innerHTML + "</div>";
+      }
+      previewHtml += sanitizeHtml(clone.innerHTML);
+      const truncated = truncateHtml(previewHtml, 600);
       pagePreviewCache.set(url, truncated);
       return truncated;
     } catch (_err) {
@@ -108,25 +108,18 @@
   var globalActiveTip = null;
   function buildTooltipContent(m, previewHtml) {
     const hasTooltip = !!m.tooltip;
-    const hasLink = !!m.link;
     let html = "";
     if (hasTooltip) {
-      html += `<span class="zm-st-tooltip-label" style="white-space:nowrap;font-weight:600;">${escapeHtml(m.tooltip)}</span>`;
+      html += `<div class="zm-st-tooltip-title">${escapeHtml(m.tooltip)}</div>`;
     }
-    if (hasLink) {
-      const name = pageName(m.link);
-      const url = normalizeLink(m.link);
-      if (hasTooltip) html += '<hr style="margin:4px 0;border-color:rgba(255,255,255,0.15);">';
-      html += `<a class="zm-st-tooltip-link" href="${escapeHtml(url)}" style="color:#8cb4ff;text-decoration:underline;display:flex;align-items:center;gap:5px;margin-bottom:4px;"><img src="/img/zoom-map-icons/anchor.svg" alt="" style="width:14px;height:14px;flex-shrink:0;">${escapeHtml(name)}</a>`;
-      if (previewHtml !== void 0) {
-        if (previewHtml) {
-          html += `<div class="zm-st-preview-html" style="max-height:160px;overflow-y:auto;word-break:break-word;">${previewHtml}</div>`;
-        }
-      } else {
-        html += `<div class="zm-st-preview-text zm-st-preview-loading" style="font-size:12px;opacity:0.55;">\u52A0\u8F7D\u9884\u89C8\u4E2D\u2026</div>`;
+    if (previewHtml !== void 0) {
+      if (previewHtml) {
+        html += `<div class="zm-st-preview-html">${previewHtml}</div>`;
       }
+    } else {
+      html += `<div class="zm-st-preview-loading">Loading preview\u2026</div>`;
     }
-    return html;
+    return html || `<div class="zm-st-tooltip-title">${escapeHtml(m.name || "")}</div>`;
   }
   function el(tag, parent, attrs, cls) {
     const e = parent.ownerDocument.createElement(tag);
@@ -154,14 +147,46 @@
     const style = document.createElement("style");
     style.id = "zm-st-preview-css";
     style.textContent = `
-/* Zoom Map static \u2013 tooltip preview typography (matches site theme) */
-.zm-st-tooltip .zm-st-preview-html {
-  font-size: 12.5px;
-  line-height: 1.55;
-  color: #d0d0d0;
+/* Zoom Map static \u2013 tooltip hover preview (matches Digital Garden #tooltip-wrapper) */
+.zm-st-tooltip {
+  background: var(--background-primary);
+  padding: 1em;
+  border-radius: 4px;
+  overflow: hidden;
+  position: fixed;
+  max-width: 400px;
+  height: auto;
+  max-height: 300px;
+  font-size: 0.8em;
+  box-shadow: 0 5px 10px rgba(0,0,0,0.1);
+  z-index: 99999;
+  pointer-events: auto;
+  overflow-y: auto;
+  color: var(--text-normal);
+  line-height: 1.5;
+  opacity: 0;
+  transition: opacity 100ms;
+  unicode-bidi: plaintext;
 }
+
+.zm-st-tooltip.zm-st-tooltip-visible {
+  opacity: 1;
+}
+
+.zm-st-tooltip .zm-st-tooltip-title {
+  font-weight: 600;
+  margin-bottom: 0.5em;
+  unicode-bidi: plaintext;
+  font-size: 1.05em;
+  color: var(--text-accent);
+}
+
+.zm-st-tooltip .zm-st-preview-html {
+  /* Inherits site theme typography \u2014 same classes as the actual page */
+}
+
 .zm-st-tooltip .zm-st-preview-html p {
-  margin: 0 0 5px 0;
+  margin: 0.5em 0;
   line-height: 1.55;
 }
 .zm-st-tooltip .zm-st-preview-html p:last-child {
@@ -169,46 +194,40 @@
 }
 .zm-st-tooltip .zm-st-preview-html strong,
 .zm-st-tooltip .zm-st-preview-html b {
-  color: #e6e6e6;
+  color: var(--text-normal);
   font-weight: 600;
 }
 .zm-st-tooltip .zm-st-preview-html em,
 .zm-st-tooltip .zm-st-preview-html i {
-  color: #c8c8c8;
+  opacity: 0.85;
 }
 .zm-st-tooltip .zm-st-preview-html a {
-  color: #8cb4ff;
+  color: var(--text-accent);
 }
 .zm-st-tooltip .zm-st-preview-html h3,
 .zm-st-tooltip .zm-st-preview-html h4,
 .zm-st-tooltip .zm-st-preview-html h5,
 .zm-st-tooltip .zm-st-preview-html h6 {
-  font-size: 13px;
+  font-size: 0.95em;
   font-weight: 600;
-  margin: 7px 0 3px;
-  color: #e0e0e0;
+  margin: 0.6em 0 0.25em;
 }
 .zm-st-tooltip .zm-st-preview-html ul,
 .zm-st-tooltip .zm-st-preview-html ol {
-  padding-left: 16px;
-  margin: 4px 0;
+  padding-left: 1.5em;
+  margin: 0.4em 0;
 }
 .zm-st-tooltip .zm-st-preview-html li {
   margin-bottom: 2px;
 }
-.zm-st-tooltip .zm-st-preview-html ul li::marker,
-.zm-st-tooltip .zm-st-preview-html ol li::marker {
-  color: #999;
-}
 .zm-st-tooltip .zm-st-preview-html blockquote {
-  border-left: 3px solid rgba(255,255,255,0.22);
+  border-left: 3px solid var(--background-modifier-border, rgba(255,255,255,0.22));
   padding-left: 10px;
   margin: 6px 0;
   opacity: 0.85;
-  color: #bbb;
 }
 .zm-st-tooltip .zm-st-preview-html hr {
-  border-color: rgba(255,255,255,0.12);
+  border-color: var(--background-modifier-border, rgba(255,255,255,0.12));
   margin: 6px 0;
 }
 .zm-st-tooltip .zm-st-preview-html del,
@@ -216,10 +235,37 @@
   opacity: 0.6;
 }
 .zm-st-tooltip .zm-st-preview-html mark {
-  background: rgba(255,200,80,0.25);
-  color: #f0d060;
+  background: var(--text-highlight-bg, rgba(255,200,80,0.25));
   padding: 0 2px;
   border-radius: 2px;
+}
+.zm-st-tooltip .zm-st-preview-html code {
+  background: var(--background-secondary);
+  padding: 2px 4px;
+  border-radius: 3px;
+  font-size: 0.9em;
+}
+.zm-st-tooltip .zm-st-preview-html pre {
+  background: var(--background-secondary);
+  padding: 0.6em;
+  border-radius: 4px;
+  overflow-x: auto;
+  font-size: 0.85em;
+}
+.zm-st-tooltip .zm-st-preview-html table {
+  font-size: 0.85em;
+  border-collapse: collapse;
+}
+.zm-st-tooltip .zm-st-preview-html th,
+.zm-st-tooltip .zm-st-preview-html td {
+  border: 1px solid var(--background-modifier-border, rgba(255,255,255,0.15));
+  padding: 3px 6px;
+}
+
+.zm-st-preview-loading {
+  font-size: 0.85em;
+  opacity: 0.55;
+  color: var(--text-muted);
 }
 `;
     document.head.appendChild(style);
@@ -691,7 +737,10 @@
         clearTimeout(this.tooltipTimer);
         this.tooltipTimer = null;
       }
-      if (this.tooltipEl && this.tooltipMarkerId === (m.id || "")) return;
+      if (this.tooltipEl && this.tooltipMarkerId === (m.id || "")) {
+        this.tooltipEl.style.opacity = "1";
+        return;
+      }
       this.disposeTooltip();
       const id = m.id || "marker-" + Math.random().toString(36).slice(2);
       this.tooltipMarkerId = id;
@@ -699,13 +748,23 @@
       this.tooltipPreviewFetched = false;
       const tip = el("div", document.body, {}, "zm-st-tooltip");
       tip.innerHTML = buildTooltipContent(m);
-      tip.style.cssText = "position:fixed;z-index:99999;background:rgba(0,0,0,0.92);color:#fff;padding:10px 14px;border-radius:8px;font-size:13px;pointer-events:none;font-family:sans-serif;display:flex;flex-direction:column;gap:4px;max-width:380px;box-shadow:0 4px 16px rgba(0,0,0,0.45);";
       this.tooltipEl = tip;
+      tip.addEventListener("mouseenter", () => {
+        if (this.tooltipTimer) {
+          clearTimeout(this.tooltipTimer);
+          this.tooltipTimer = null;
+        }
+        if (this.tooltipEl) this.tooltipEl.style.opacity = "1";
+      });
+      tip.addEventListener("mouseleave", () => this.hideTooltip());
       if (globalActiveTip && globalActiveTip.tip !== tip) {
         globalActiveTip.tip.remove();
       }
       globalActiveTip = { tip, markerId: id };
       this.repositionTooltip(host);
+      requestAnimationFrame(() => {
+        if (this.tooltipEl === tip) this.tooltipEl.classList.add("zm-st-tooltip-visible");
+      });
       if (m.link) {
         const url = normalizeLink(m.link);
         const capturedId = id;
@@ -719,25 +778,45 @@
     }
     repositionTooltip(host) {
       if (!this.tooltipEl) return;
-      const r = host.getBoundingClientRect();
-      let left = r.left + r.width / 2;
-      let top = r.top - 10;
-      const tw = this.tooltipEl.offsetWidth;
-      const th = this.tooltipEl.offsetHeight;
-      if (left - tw / 2 < 4) left = tw / 2 + 4;
-      if (left + tw / 2 > window.innerWidth - 4) left = window.innerWidth - tw / 2 - 4;
-      if (top < 4) top = r.bottom + 10;
-      if (top + th > window.innerHeight - 4) top = window.innerHeight - th - 4;
+      const r = host.getClientRects()[host.getClientRects().length - 1] || host.getBoundingClientRect();
+      const viewportWidth = document.documentElement.clientWidth;
+      const viewportHeight = window.innerHeight;
+      const gap = 12;
+      const edgePadding = 10;
+      const spaceBelow = viewportHeight - r.bottom;
+      const spaceAbove = r.top;
+      const spaceRight = viewportWidth - r.right;
+      const spaceLeft = r.left;
+      const placeBelow = spaceBelow >= this.tooltipEl.offsetHeight + gap;
+      const placeRight = spaceRight >= this.tooltipEl.offsetWidth + gap;
+      let top;
+      let left;
+      if (placeBelow) {
+        top = r.bottom + gap;
+      } else {
+        top = r.top - this.tooltipEl.offsetHeight - gap;
+      }
+      if (placeRight) {
+        left = r.left;
+      } else {
+        left = r.right - this.tooltipEl.offsetWidth;
+      }
+      if (top < edgePadding) top = edgePadding;
+      if (top + this.tooltipEl.offsetHeight + edgePadding > viewportHeight) {
+        top = viewportHeight - this.tooltipEl.offsetHeight - edgePadding;
+      }
+      if (left < edgePadding) left = edgePadding;
+      if (left + this.tooltipEl.offsetWidth + edgePadding > viewportWidth) {
+        left = viewportWidth - this.tooltipEl.offsetWidth - edgePadding;
+      }
       this.tooltipEl.style.left = `${left}px`;
       this.tooltipEl.style.top = `${top}px`;
-      this.tooltipEl.style.transform = "translate(-50%, -100%)";
     }
     hideTooltip() {
       if (this.tooltipTimer) clearTimeout(this.tooltipTimer);
       this.tooltipTimer = setTimeout(() => {
         this.disposeTooltip();
-        this.tooltipTimer = null;
-      }, 150);
+      }, 120);
     }
     disposeTooltip() {
       if (this.tooltipTimer) {
