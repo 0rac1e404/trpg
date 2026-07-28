@@ -113,8 +113,18 @@ function buildPageNameIndex() {
 
           // Page name = file name without extension
           var pageName = e.name.replace(/\.md$/i, "");
-          // Prefer shorter path when there are duplicates
-          if (!index[pageName] || index[pageName].length > permalink.length) {
+          // Full relative path from notes root (for exact-path lookup)
+          var relPath = full
+            .replace(/\\/g, "/")
+            .replace(NOTES_ROOT.replace(/\\/g, "/"), "")
+            .replace(/^\/+/, "")
+            .replace(/\.md$/i, "");
+          // Index by full relative path (highest priority)
+          index[relPath] = permalink;
+          // Index by page name (fallback for short wiki-link names)
+          // If there are duplicates, prefer the one with the LONGER permalink
+          // (more specific / nested location is usually the correct target)
+          if (!index[pageName] || index[pageName].length < permalink.length) {
             index[pageName] = permalink;
           }
 

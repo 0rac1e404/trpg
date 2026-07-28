@@ -20,21 +20,20 @@
     if (!link) return link;
     if (link.startsWith("http://") || link.startsWith("https://") || link.startsWith("#")) return link;
     let p = link.replace(/\.md$/i, "");
-    if (!p.includes("/")) {
-      const index = getPageNameIndex();
-      if (index && index[p]) {
-        return index[p];
+    const index = getPageNameIndex();
+    if (p.includes("/") && index) {
+      const normalized = p.replace(/^\/+|\/+$/g, "");
+      if (index[normalized]) {
+        return index[normalized];
       }
+    }
+    const bare = p.replace(/^\/+|\/+$/g, "");
+    const pageName = bare.includes("/") ? bare.split("/").pop() : bare;
+    if (index && index[pageName]) {
+      return index[pageName];
     }
     if (!p.startsWith("/")) p = "/" + p;
     if (!p.endsWith("/") && !/\.[a-zA-Z0-9]+$/.test(p)) p += "/";
-    if (!p.includes("/", 1)) {
-      const bare = p.replace(/^\/|\/$/g, "");
-      const index = getPageNameIndex();
-      if (index && index[bare]) {
-        return index[bare];
-      }
-    }
     return p;
   }
   function escapeHtml(s) {
