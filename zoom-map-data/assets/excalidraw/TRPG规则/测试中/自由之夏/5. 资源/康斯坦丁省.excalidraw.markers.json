@@ -1,0 +1,82 @@
+{
+  "size": {
+    "w": 1951,
+    "h": 1257
+  },
+  "layers": [
+    {
+      "id": "default",
+      "name": "Default",
+      "visible": true,
+      "locked": false
+    }
+  ],
+  "markers": [
+    {
+      "type": "pin",
+      "id": "marker_eimk9q",
+      "x": 0.5430681905248429,
+      "y": 0.1915320495034421,
+      "layer": "default",
+      "link": "菲利普维尔",
+      "iconKey": "pinRed",
+      "tooltip": "菲利普维尔",
+      "scaleLikeSticker": true,
+      "iconColor": "#ff0000",
+      "tooltipAlwaysOn": true
+    }
+  ],
+  "bases": [
+    {
+      "path": "TRPG规则/测试中/自由之夏/5. 资源/康斯坦丁省.excalidraw.svg",
+      "name": "康斯坦丁省"
+    }
+  ],
+  "overlays": [],
+  "activeBase": "TRPG规则/测试中/自由之夏/5. 资源/康斯坦丁省.excalidraw.svg",
+  "measurement": {
+    "scales": {},
+    "customUnitPxPerUnit": {},
+    "travelTimePresetIds": [],
+    "travelDaysEnabled": false,
+    "displayUnit": "km"
+  },
+  "pinSizeOverrides": {
+    "pinRed": 60
+  },
+  "grids": [],
+  "panClamp": true,
+  "drawLayers": [],
+  "drawings": [],
+  "secondScreen": {
+    "showGrids": true
+  },
+  "textLayers": [],
+  "deleted": [
+    {
+      "id": "undo_iu7x6h",
+      "label": "Delete marker",
+      "createdAt": "2026-10-23T15:48:53.547Z",
+      "payload": {
+        "kind": "marker",
+        "marker": {
+          "id": "marker_5s41vs",
+          "x": 0.5818298416109785,
+          "y": 0.46260974670473626,
+          "layer": "default",
+          "link": "",
+          "iconKey": "pinRed",
+          "tooltip": "",
+          "anchorSpace": "viewport",
+          "hudX": 406.3499755859375,
+          "hudY": 221.3125,
+          "hudModeX": "right",
+          "hudModeY": "top",
+          "hudLastWidth": 698.4000244140625,
+          "hudLastHeight": 478.3999938964844
+        },
+        "index": 0
+      }
+    }
+  ]
+}

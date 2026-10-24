@@ -847,6 +847,16 @@ module.exports = function(eleventyConfig) {
   eleventyConfig.addPassthroughCopy("src/site/scripts");
   eleventyConfig.addPassthroughCopy("src/site/styles/_theme.*.css");
   eleventyConfig.addPassthroughCopy({ "src/site/logo.*": "/" });
+
+  // ZoomMap assets (map images + markers.json), synced from the vault by
+  // scripts/sync-zoommap-assets.js. They are emitted at the site root under
+  // their original vault path because that is what the renderer requests:
+  // normPath() prefixes a vault path with "/" (see src/site/scripts/
+  // zoom-map-static.js), so "TRPG规则/…/地图.svg" is fetched as
+  // "/TRPG规则/…/地图.svg".
+  eleventyConfig.addPassthroughCopy({
+    "zoom-map-data/assets/excalidraw/": "/",
+  });
   eleventyConfig.on("eleventy.before", () => {
     normalizeFavicon(FAVICON_SOURCE, FAVICON_NORMALIZED);
     anchorAttributesCache.clear();
