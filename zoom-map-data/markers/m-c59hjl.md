@@ -1,8 +1,13 @@
 ---
-zoommapMarkersPath: TRPG规则/伯爵红茶/星图/the Vast.excalidraw.markers.json
-sourceFile: TRPG规则/伯爵红茶/星图/the Vast.excalidraw.markers.json
+publish: true
+ttrpgtools: "ttrpgtools-publish"
+ttrpgtoolsData: "markers"
+zoommapMarkersPath: "TRPG规则/伯爵红茶/星图/the Vast.excalidraw.markers.json"
+sourceFile: "TRPG规则/伯爵红茶/星图/the Vast.excalidraw.markers.json"
+zoommapSourceMtime: 1785769367612
+zoommapTextLayerRasterEnabled: false
+generatedAt: "2026-08-16T10:32:13.918Z"
 ---
-
 
 # TTRPG Tools: Maps publish data (markers)
 
@@ -72,6 +77,19 @@ sourceFile: TRPG规则/伯爵红茶/星图/the Vast.excalidraw.markers.json
       "scaleLikeSticker": true,
       "tooltipAlwaysOn": true,
       "sizeOverride": 18
+    },
+    {
+      "type": "pin",
+      "id": "marker_qicyek",
+      "x": 0.30207071198226926,
+      "y": 0.5688306112091104,
+      "layer": "default",
+      "link": "提坦尼克",
+      "iconKey": "port",
+      "tooltip": "提坦尼克",
+      "tooltipAlwaysOn": true,
+      "sizeOverride": 18,
+      "scaleLikeSticker": true
     }
   ],
   "bases": [
