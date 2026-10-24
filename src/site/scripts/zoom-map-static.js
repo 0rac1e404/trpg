@@ -467,18 +467,34 @@
       const dataCfg = container.getAttribute("data-zm-config");
       if (dataCfg) {
         try {
-          return JSON.parse(dataCfg);
+          const cfg = JSON.parse(dataCfg);
+          this.applyPinSizeOverrides(cfg, container);
+          return cfg;
         } catch (e) {
         }
       }
       const script = container.querySelector("script.zm-config-json");
       if (script == null ? void 0 : script.textContent) {
         try {
-          return JSON.parse(script.textContent);
+          const cfg = JSON.parse(script.textContent);
+          this.applyPinSizeOverrides(cfg, container);
+          return cfg;
         } catch (e) {
         }
       }
       return this.loadConfigFromAttrs(container);
+    }
+    /** Per-icon size overrides live in the markers JSON, which is fetched after
+     *  the config has already been written, so they travel on their own
+     *  attribute instead of being baked into the config. */
+    applyPinSizeOverrides(cfg, container) {
+      if (cfg.pinSizeOverrides) return;
+      const raw = container.getAttribute("data-zm-pinsize");
+      if (!raw) return;
+      try {
+        cfg.pinSizeOverrides = JSON.parse(raw);
+      } catch (e) {
+      }
     }
     loadConfigFromAttrs(container) {
       var _a, _b, _c, _d, _e, _f, _g, _h, _i;
@@ -682,7 +698,7 @@
     }
     /* ---- marker rendering ---- */
     renderMarkers() {
-      var _a, _b, _c, _d, _e, _f;
+      var _a, _b, _c, _d, _e, _f, _g;
       this.closePopover();
       while (this.markersEl.firstChild) this.markersEl.removeChild(this.markersEl.firstChild);
       const s = this.scale;
@@ -698,8 +714,9 @@
           this.renderSimpleMarker(m);
           continue;
         }
-        const baseSize = typeof m.sizeOverride === "number" && m.sizeOverride > 0 ? m.sizeOverride : icon.size;
-        const scaleMul = (_b = m.scale) != null ? _b : 1;
+        const pinOverride = m.iconKey ? (_b = this.cfg.pinSizeOverrides) == null ? void 0 : _b[m.iconKey] : void 0;
+        const baseSize = typeof m.sizeOverride === "number" && m.sizeOverride > 0 ? m.sizeOverride : typeof pinOverride === "number" && pinOverride > 0 ? pinOverride : icon.size;
+        const scaleMul = (_c = m.scale) != null ? _c : 1;
         const size = baseSize * scaleMul;
         const ax = icon.anchorX;
         const ay = icon.anchorY;
@@ -719,10 +736,10 @@
           host.style.transform = `rotate(${icon.rotationDeg}deg)`;
         }
         if (icon.shadowEnabled) {
-          const sc = (_c = icon.shadowColor) != null ? _c : "rgba(0,0,0,0.35)";
-          const blur = (_d = icon.shadowBlurPx) != null ? _d : 3;
-          const sx = (_e = icon.shadowOffsetXPx) != null ? _e : 1;
-          const sy = (_f = icon.shadowOffsetYPx) != null ? _f : 1;
+          const sc = (_d = icon.shadowColor) != null ? _d : "rgba(0,0,0,0.35)";
+          const blur = (_e = icon.shadowBlurPx) != null ? _e : 3;
+          const sx = (_f = icon.shadowOffsetXPx) != null ? _f : 1;
+          const sy = (_g = icon.shadowOffsetYPx) != null ? _g : 1;
           img.style.filter = `drop-shadow(${sx}px ${sy}px ${blur}px ${sc})`;
         }
         if (m.tooltip) {
@@ -1001,6 +1018,9 @@
             if (data == null ? void 0 : data.markers) {
               wrapper.setAttribute("data-zm-markers", JSON.stringify(data.markers));
             }
+            if (data == null ? void 0 : data.pinSizeOverrides) {
+              wrapper.setAttribute("data-zm-pinsize", JSON.stringify(data.pinSizeOverrides));
+            }
           } catch (_e) {
           }
         }
@@ -1011,6 +1031,9 @@
         instances.push(map);
         if (!wrapper.hasAttribute("data-zm-markers") && config.markersUrl) {
           fetch(config.markersUrl).then((r) => r.ok ? r.json() : null).catch(() => null).then((data) => {
+            if (data == null ? void 0 : data.pinSizeOverrides) {
+              wrapper.setAttribute("data-zm-pinsize", JSON.stringify(data.pinSizeOverrides));
+            }
             if (data == null ? void 0 : data.markers) {
               const markers = data.markers;
               wrapper.setAttribute("data-zm-markers", JSON.stringify(markers));
