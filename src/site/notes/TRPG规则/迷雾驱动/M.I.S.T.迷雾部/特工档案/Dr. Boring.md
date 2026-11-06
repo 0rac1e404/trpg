@@ -1,5 +1,5 @@
 ---
-{"dg-publish":true,"permalink":"/TRPG规则/迷雾驱动/M.I.S.T.迷雾部/特工档案/Dr. Boring/"}
+{"dg-publish":true,"permalink":"/TRPG规则/迷雾驱动/M.I.S.T.迷雾部/特工档案/Dr. Boring/","dg-note-properties":{}}
 ---
 
 > [!info]- 完全正常的白大褂
