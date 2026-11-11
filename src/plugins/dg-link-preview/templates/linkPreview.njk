@@ -37,6 +37,28 @@
   height: 260px;
   border: 0;
 }
+
+/* Tables (markdown / dataview results) inside the hover preview.
+   Table cells use explicit var(--table-text-size) so they ignore the
+   tooltip's 0.8em and look oversized in the popup; scope the variables
+   here instead of fighting each rule. */
+#tooltip-wrapper {
+  --table-text-size: 0.9em;
+  --table-header-size: 0.9em;
+  --table-white-space: normal;
+  --table-column-min-width: 0;
+}
+
+#tooltip-wrapper td,
+#tooltip-wrapper th {
+  font-size: inherit;
+  white-space: normal;
+  min-width: 0;
+}
+
+#tooltip-wrapper .table-view-table > thead > tr > th {
+  font-size: inherit;
+}
 </style>
 <div style="opacity: 0; display: none;" id='tooltip-wrapper'>
   <div id='tooltip-content'>
