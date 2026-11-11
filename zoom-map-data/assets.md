@@ -10,7 +10,8 @@ Publish this note, then use **Publish changes → Add linked** to include all ma
 ## Assets
 
 - [[TRPG规则/伯爵红茶/星图/the Vast.excalidraw.svg]]
+- [[TRPG规则/测试中/伯爵红茶/星图/the Vast.excalidraw.svg]]
 - [[ZoomMap/publish/assets]]
 - [[ZoomMap/publish/library]]
-- [[ZoomMap/publish/markers/m-c59hjl]]
+- [[ZoomMap/publish/markers/m-1nzxxal]]
 - [[ZoomMap/SVGs/rpg-awesome-raw-master/Font/anchor.svg]]

@@ -24,6 +24,42 @@
       "scaleLikeSticker": true,
       "iconColor": "#ff0000",
       "tooltipAlwaysOn": true
+    },
+    {
+      "type": "pin",
+      "id": "marker_75b37s",
+      "x": 0.5045874983455874,
+      "y": 0.38351696913917105,
+      "layer": "default",
+      "link": "康斯坦丁",
+      "iconKey": "pinRed",
+      "tooltip": "康斯坦丁",
+      "scaleLikeSticker": true,
+      "tooltipAlwaysOn": true
+    },
+    {
+      "type": "pin",
+      "id": "marker_9y2qp7",
+      "x": 0.6691499620861954,
+      "y": 0.1716419261026374,
+      "layer": "default",
+      "link": "博内",
+      "iconKey": "pinRed",
+      "tooltip": "博内",
+      "tooltipAlwaysOn": true,
+      "scaleLikeSticker": true
+    },
+    {
+      "type": "pin",
+      "id": "marker_bl3hb8",
+      "x": 0.6643041270904718,
+      "y": 0.2941605914344422,
+      "layer": "default",
+      "link": "盖勒玛",
+      "iconKey": "pinRed",
+      "tooltip": "盖勒玛",
+      "tooltipAlwaysOn": true,
+      "scaleLikeSticker": true
     }
   ],
   "bases": [
