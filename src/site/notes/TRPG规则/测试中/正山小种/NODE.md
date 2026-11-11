@@ -1,5 +1,5 @@
 ---
-{"dg-publish":true,"permalink":"/TRPG规则/测试中/正山小种/NODE/"}
+{"dg-publish":true,"permalink":"/TRPG规则/测试中/正山小种/NODE/","dg-note-properties":{}}
 ---
 
 在游戏里，无论是潜入守备严密的庄园、在复杂的人际关系中说服一个关键证人，还是在一场九死一生的灾难中逃生，GM 都会使用节点图来代表“达成一个目标”的过程。
