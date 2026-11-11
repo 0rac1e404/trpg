@@ -1,5 +1,5 @@
 ---
-{"dg-publish":true,"permalink":"/博客/《Metro：Otherscape》规则评论/","dg-note-properties":{}}
+{"dg-publish":true,"permalink":"/博客/《Metro：Otherscape》规则评论/"}
 ---
 
 # Metro:Otherscape是什么？
