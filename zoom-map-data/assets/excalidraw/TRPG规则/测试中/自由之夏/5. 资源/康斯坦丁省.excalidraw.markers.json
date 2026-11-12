@@ -15,8 +15,8 @@
     {
       "type": "pin",
       "id": "marker_eimk9q",
-      "x": 0.5430681905248429,
-      "y": 0.1915320495034421,
+      "x": 0.5444907774650081,
+      "y": 0.19042812930382022,
       "layer": "default",
       "link": "菲利普维尔",
       "iconKey": "pinRed",
@@ -55,11 +55,25 @@
       "x": 0.6643041270904718,
       "y": 0.2941605914344422,
       "layer": "default",
-      "link": "盖勒玛",
+      "link": "盖勒马",
       "iconKey": "pinRed",
-      "tooltip": "盖勒玛",
+      "tooltip": "",
       "tooltipAlwaysOn": true,
-      "scaleLikeSticker": true
+      "scaleLikeSticker": true,
+      "tooltipLabelAlways": true,
+      "tooltipLabelPosition": "below"
+    },
+    {
+      "type": "pin",
+      "id": "marker_n4n72l",
+      "x": 0.5952804745156735,
+      "y": 0.023275646032941084,
+      "layer": "default",
+      "link": "新闻汇总",
+      "iconKey": "rss",
+      "tooltip": "",
+      "scaleLikeSticker": true,
+      "sizeOverride": 120
     }
   ],
   "bases": [

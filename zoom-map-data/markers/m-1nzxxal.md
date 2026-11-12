@@ -1,13 +1,8 @@
 ---
-publish: true
-ttrpgtools: "ttrpgtools-publish"
-ttrpgtoolsData: "markers"
-zoommapMarkersPath: "TRPG规则/测试中/伯爵红茶/星图/the Vast.excalidraw.markers.json"
-sourceFile: "TRPG规则/测试中/伯爵红茶/星图/the Vast.excalidraw.markers.json"
-zoommapSourceMtime: 1785769367612
-zoommapTextLayerRasterEnabled: false
-generatedAt: "2026-11-11T05:14:27.184Z"
+zoommapMarkersPath: TRPG规则/测试中/伯爵红茶/星图/the Vast.excalidraw.markers.json
+sourceFile: TRPG规则/测试中/伯爵红茶/星图/the Vast.excalidraw.markers.json
 ---
+
 
 # TTRPG Tools: Maps publish data (markers)
 
