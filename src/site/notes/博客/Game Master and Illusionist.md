@@ -1,5 +1,5 @@
 ---
-{"dg-publish":true,"permalink":"/博客/Game Master and Illusionist/","dg-note-properties":{}}
+{"dg-publish":true,"permalink":"/博客/Game Master and Illusionist/"}
 ---
 
 我一直有着这样一种奇怪的想法: GM与魔术师十分相似。
